@@ -141,6 +141,20 @@ O destino do build do Nitro é escolhido automaticamente:
    Em especial `PUBLIC_BASE_URL=https://SEU_DOMINIO`.
 3. Não é preciso mais nada: `vercel.json` define `installCommand`/`buildCommand`.
 
+> **Atenção (Replit → Vercel)**: o Replit instala pacotes através de um proxy
+> interno (`package-firewall.replit.internal`). Se o `package-lock.json` for
+> gerado ou atualizado lá, a Vercel não consegue instalar e o build falha com
+> `ENOTFOUND package-firewall.replit.internal`.
+>
+> Antes de fazer commit/push, corre:
+>
+> ```sh
+> npm run fix:lockfile
+> ```
+>
+> O script troca apenas o prefixo dos URLs para o registry público
+> (`https://registry.npmjs.org/`); versões e hashes de integridade não mudam.
+
 ### Replit
 
 O ficheiro `.replit` já está configurado (`run = "npm run dev"`, porta `8080`).

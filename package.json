@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "fix:lockfile": "node scripts/normalize-lockfile.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
