@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type {
   AdminKpis,
   OrderRow,
+  PaymentMethod,
   Product,
   Region,
   SupportMessage,
@@ -58,16 +59,12 @@ export type SiteContext = {
   integrations: Integrations;
 };
 
-export type EmolaTargets = {
-  personal: { label: string; number: string; holder: string; note: string };
-  company: { label: string; number: string; holder: string; note: string };
-  instructions: string[];
-};
-
 export type CheckoutContext = {
   region: Region;
   product: Product | null;
-  emola: EmolaTargets;
+  /** Carteiras móveis ativas (e-Mola, M-Pesa) com número editável no painel. */
+  methods: PaymentMethod[];
+  instructions: string[];
   pixEnabled: boolean;
   databaseConfigured: boolean;
 };
@@ -103,6 +100,7 @@ export type AdminOverview = {
   orders: OrderRow[];
   visits: VisitRow[];
   supportThreads: SupportThread[];
+  paymentMethods: PaymentMethod[];
   databaseConfigured: boolean;
   pixConfigured: boolean;
 };
@@ -145,30 +143,17 @@ export const getCheckoutContext = createServerFn({ method: "POST" })
       import("./infinigate.server"),
     ]);
 
-    const [product, detected] = await Promise.all([
+    const [product, detected, wallets] = await Promise.all([
       catalog.findProduct(data.productId),
       region.detectRegion(),
+      catalog.listPaymentMethods(),
     ]);
-    const config = emola.emolaConfig();
 
     return {
       region: detected,
       product,
-      emola: {
-        personal: {
-          label: config.personal.label,
-          number: config.personal.number,
-          holder: config.personal.holder,
-          note: config.personal.note,
-        },
-        company: {
-          label: config.company.label,
-          number: config.company.number,
-          holder: config.company.holder,
-          note: config.company.note,
-        },
-        instructions: config.instructions,
-      },
+      methods: wallets.methods,
+      instructions: emola.walletInstructions(),
       pixEnabled: infinigate.infinigateConfigured(),
       databaseConfigured: supabase.getSupabase() !== null,
     };
@@ -206,17 +191,16 @@ export const trackVisit = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/* ------------------------------------------------------------- pedido e-Mola */
+/* ---------------------------------------------------- pedido carteira móvel */
 
 export const submitEmolaOrder = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const raw = record(input);
-    const target = raw["target"] === "company" ? "company" : "personal";
     return {
       productId: str(raw["productId"], 60) ?? "",
       name: str(raw["name"], 120) ?? "",
       emolaNumber: str(raw["emolaNumber"], 30) ?? "",
-      target,
+      methodId: str(raw["methodId"], 40) ?? "",
       confirmationMessage: str(raw["confirmationMessage"], 1200) ?? "",
       contact: str(raw["contact"], 160) ?? "",
     };
@@ -233,15 +217,15 @@ export const submitEmolaOrder = createServerFn({ method: "POST" })
         return { ok: false, error: "Preencha todos os campos para enviar o pedido." };
       }
 
-      const [catalog, emola] = await Promise.all([
-        import("./catalog.server"),
-        import("./emola.server"),
-      ]);
+      const catalog = await import("./catalog.server");
       const product = await catalog.findProduct(data.productId);
       if (!product) return { ok: false, error: "Edição não encontrada." };
 
-      const config = emola.emolaConfig();
-      const chosen = data.target === "company" ? config.company : config.personal;
+      const wallets = await catalog.listPaymentMethods();
+      const chosen =
+        wallets.methods.find((method) => method.id === data.methodId) ?? wallets.methods[0];
+      if (!chosen) return { ok: false, error: "Nenhuma carteira móvel configurada." };
+
       const isEmail = data.contact.includes("@");
 
       const created = await catalog.createOrder({
@@ -256,7 +240,7 @@ export const submitEmolaOrder = createServerFn({ method: "POST" })
         customerContact: data.contact,
         document: null,
         emolaNumber: data.emolaNumber,
-        emolaTarget: chosen.number,
+        emolaTarget: `${chosen.label} · ${chosen.number}`,
         confirmationMessage: data.confirmationMessage,
       });
 
@@ -432,12 +416,13 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
       import("./infinigate.server"),
     ]);
 
-    const [kpis, products, orders, visits, supportThreads] = await Promise.all([
+    const [kpis, products, orders, visits, supportThreads, wallets] = await Promise.all([
       catalog.adminKpis(),
       catalog.listProducts(),
       catalog.listOrders(80),
       catalog.listVisits(80),
       catalog.listSupportThreads(),
+      catalog.listPaymentMethods(true),
     ]);
 
     if (!kpis) return { ok: false, error: "Base de dados não configurada." };
@@ -450,6 +435,7 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
         orders,
         visits,
         supportThreads,
+        paymentMethods: wallets.methods,
         databaseConfigured: supabase.getSupabase() !== null,
         pixConfigured: infinigate.infinigateConfigured(),
       },
@@ -468,6 +454,35 @@ export const adminUpdatePrice = createServerFn({ method: "POST" })
 
     const catalog = await import("./catalog.server");
     const error = await catalog.updateProductPrice(data.id, data.price);
+    return error ? { ok: false, error } : { ok: true };
+  });
+
+export const adminUpdatePaymentMethod = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = record(input);
+    return {
+      id: str(raw["id"], 40) ?? "",
+      label: str(raw["label"], 40) ?? "",
+      number: str(raw["number"], 30) ?? "",
+      holder: str(raw["holder"], 80) ?? "",
+      note: str(raw["note"], 200) ?? "",
+      active: raw["active"] !== false,
+    };
+  })
+  .handler(async ({ data }): Promise<ActionResult> => {
+    if (!(await adminEmail())) return { ok: false, error: "Sessão expirada. Entre novamente." };
+    if (!data.id) return { ok: false, error: "Carteira inválida." };
+    if (!data.label) return { ok: false, error: "Indique o nome da carteira." };
+    if (!data.number) return { ok: false, error: "Indique o número da carteira." };
+
+    const catalog = await import("./catalog.server");
+    const error = await catalog.updatePaymentMethod(data.id, {
+      label: data.label,
+      number: data.number,
+      holder: data.holder,
+      note: data.note,
+      active: data.active,
+    });
     return error ? { ok: false, error } : { ok: true };
   });
 

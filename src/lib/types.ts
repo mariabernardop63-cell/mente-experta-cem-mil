@@ -44,6 +44,20 @@ export type OrderRow = {
   payment_reference: string | null;
 };
 
+/**
+ * Carteira móvel usada nos pagamentos de Moçambique.
+ * O número e o titular são editáveis no painel `/admin` (separador Pagamentos).
+ */
+export type PaymentMethod = {
+  id: string;
+  label: string;
+  number: string;
+  holder: string;
+  note: string;
+  active: boolean;
+  sortOrder: number;
+};
+
 export type VisitRow = {
   id: number;
   created_at: string;
@@ -110,6 +124,28 @@ export const FALLBACK_PRODUCTS: Product[] = [
     ],
     premium: true,
     hasPdf: false,
+    sortOrder: 2,
+  },
+];
+
+/** Carteiras móveis por omissão (Moçambique). O painel /admin pode alterar. */
+export const FALLBACK_PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: "emola",
+    label: "e-Mola",
+    number: "8738373838",
+    holder: "MenteExperta",
+    note: "Transferência e-Mola para a conta MenteExperta.",
+    active: true,
+    sortOrder: 1,
+  },
+  {
+    id: "mpesa",
+    label: "M-Pesa",
+    number: "8783838929",
+    holder: "Experience Beta",
+    note: "Transferência M-Pesa para a conta MenteExperta.",
+    active: true,
     sortOrder: 2,
   },
 ];

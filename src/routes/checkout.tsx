@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
-  Building2,
   Check,
   ClipboardCopy,
   Clock,
@@ -15,11 +14,11 @@ import {
   ShieldCheck,
   Smartphone,
   User,
+  Wallet,
 } from "lucide-react";
 
 import { createPixOrder, getCheckoutContext, getOrderStatus, submitEmolaOrder } from "@/lib/api";
-import type { EmolaTargets } from "@/lib/api";
-import { formatPrice } from "@/lib/types";
+import { formatPrice, type PaymentMethod } from "@/lib/types";
 
 export const Route = createFileRoute("/checkout")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -91,7 +90,7 @@ function CheckoutPage() {
                 {region.isMozambique ? (
                   <>
                     <Smartphone size={14} /> Detetámos um acesso de Moçambique — pagamento por
-                    transferência e-Mola.
+                    carteira móvel (e-Mola ou M-Pesa).
                   </>
                 ) : (
                   <>
@@ -121,7 +120,8 @@ function CheckoutPage() {
                 productName={product.name}
                 price={product.price}
                 symbol={symbol}
-                emola={context.emola}
+                methods={context.methods}
+                instructions={context.instructions}
               />
             ) : (
               <PixFlow
@@ -144,23 +144,25 @@ function CheckoutPage() {
   );
 }
 
-/* ------------------------------------------------------------- e-Mola (MZ) */
+/* --------------------------------------------------- carteira móvel (MZ) */
 
 function EmolaFlow({
   productId,
   productName,
   price,
   symbol,
-  emola,
+  methods,
+  instructions,
 }: {
   productId: string;
   productName: string;
   price: number;
   symbol: string;
-  emola: EmolaTargets;
+  methods: PaymentMethod[];
+  instructions: string[];
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [target, setTarget] = useState<"personal" | "company">("personal");
+  const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
   const [name, setName] = useState("");
   const [senderNumber, setSenderNumber] = useState("");
   const [message, setMessage] = useState("");
@@ -169,10 +171,14 @@ function EmolaFlow({
   const [busy, setBusy] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
 
-  const chosen = emola[target];
+  const chosen = methods.find((method) => method.id === methodId) ?? methods[0] ?? null;
 
   async function submit() {
     setError(null);
+    if (!chosen) {
+      setError("Nenhuma carteira móvel está disponível para pagamento neste momento.");
+      return;
+    }
     if (!name.trim() || !senderNumber.trim() || !message.trim()) {
       setError("Preencha o nome, o número de onde transferiu e a mensagem de confirmação.");
       return;
@@ -189,7 +195,7 @@ function EmolaFlow({
           productId,
           name,
           emolaNumber: senderNumber,
-          target,
+          methodId: chosen.id,
           confirmationMessage: message,
           contact,
         },
@@ -205,6 +211,24 @@ function EmolaFlow({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!chosen) {
+    return (
+      <div className="pay-state pay-blocked">
+        <span className="pay-state-icon">
+          <Lock size={28} />
+        </span>
+        <h2>Carteiras móveis indisponíveis</h2>
+        <p>
+          A equipa ainda não configurou os números de e-Mola e M-Pesa. Volte mais tarde ou fale com
+          o apoio pelo chat do site.
+        </p>
+        <Link to="/" className="pay-secondary">
+          Voltar ao site
+        </Link>
+      </div>
+    );
   }
 
   if (step === 3) {
@@ -253,42 +277,43 @@ function EmolaFlow({
 
       {step === 1 ? (
         <>
-          <h2>Pagamento por e-Mola</h2>
+          <h2>Pagamento por carteira móvel</h2>
           <p className="pay-hint">
             Transfira exatamente{" "}
             <strong>
               {symbol} {formatPrice(price)}
             </strong>{" "}
-            para um dos números abaixo e guarde a mensagem de confirmação.
+            para o número da carteira que escolher abaixo e guarde a mensagem de confirmação.
           </p>
 
-          <div className="pay-targets" role="radiogroup" aria-label="Escolha a conta de destino">
-            {(["personal", "company"] as const).map((key) => {
-              const item = emola[key];
-              const selected = target === key;
+          <div className="pay-targets" role="radiogroup" aria-label="Escolha a carteira de destino">
+            {methods.map((method) => {
+              const selected = chosen.id === method.id;
               return (
                 <button
                   type="button"
-                  key={key}
+                  key={method.id}
                   role="radio"
                   aria-checked={selected}
                   className={`pay-target ${selected ? "selected" : ""}`}
-                  onClick={() => setTarget(key)}
+                  onClick={() => setMethodId(method.id)}
                 >
                   <span className="pay-target-head">
-                    {key === "personal" ? <Smartphone size={16} /> : <Building2 size={16} />}
-                    {item.label}
+                    {method.id === "mpesa" ? <Wallet size={16} /> : <Smartphone size={16} />}
+                    {method.label}
                   </span>
-                  <strong>{item.number}</strong>
-                  <span className="pay-target-holder">{item.holder}</span>
-                  <span className="pay-target-note">{item.note}</span>
+                  <strong>{method.number}</strong>
+                  {method.holder ? (
+                    <span className="pay-target-holder">{method.holder}</span>
+                  ) : null}
+                  {method.note ? <span className="pay-target-note">{method.note}</span> : null}
                 </button>
               );
             })}
           </div>
 
           <ol className="pay-instructions">
-            {emola.instructions.map((line) => (
+            {instructions.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>
@@ -364,7 +389,9 @@ function EmolaFlow({
             </div>
             <div>
               <span>Destino</span>
-              <strong>{chosen.number}</strong>
+              <strong>
+                {chosen.label} · {chosen.number}
+              </strong>
             </div>
           </div>
 

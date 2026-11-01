@@ -2,8 +2,9 @@
 
 Landing page premium e corporativa da **MenteExperta**, com venda dos ebooks
 **Como Fazer 100K Antes de 2027** (edição Beta e Premium), pagamento por
-**PIX** (Brasil e restantes países) e por **transferência e-Mola** (Moçambique),
-painel de administração, entrega automática do PDF e registo de visitas.
+**PIX** (Brasil e restantes países) e por **carteira móvel** e-Mola ou M-Pesa
+(Moçambique), painel de administração, entrega automática do PDF e registo de
+visitas.
 
 Construída com React 19, TanStack Start (SSR), Tailwind CSS 4 e Supabase.
 
@@ -29,9 +30,9 @@ Construída com React 19, TanStack Start (SSR), Tailwind CSS 4 e Supabase.
 
 ### Checkout (`/checkout?edition=beta|premium`)
 
-- **Moçambique** → ecrã de pagamento e-Mola em 2 passos:
-  1. escolha da conta de destino (pessoal `8738373838` ou empresa
-     `8783838929` — «Experience Beta»), número de origem e **mensagem de
+- **Moçambique** → ecrã de pagamento por **carteira móvel** em 2 passos:
+  1. escolha da carteira de destino (**e-Mola** ou **M-Pesa** — os números são
+     editáveis em `/admin > Pagamentos`), número de origem e **mensagem de
      confirmação** da transferência;
   2. pedido do **WhatsApp ou e-mail** de entrega.
      No fim, informa que a entrega acontece **após verificação da equipa**.
@@ -49,9 +50,12 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
   visitas ao site (total / 7 dias / hoje), pedidos a tratar e vendas por produto.
 - **Produtos e PDFs**: editar o preço de cada edição e carregar/substituir o PDF
   que é entregue ao comprador (upload direto para o Supabase Storage).
-- **Pedidos**: lista dos pedidos e-Mola (número de origem, destino, contacto de
-  entrega e mensagem de confirmação) e dos pedidos PIX, com ações para confirmar
-  pagamento, marcar como entregue ou cancelar.
+- **Pagamentos**: números, titular e nota das carteiras móveis (**e-Mola** e
+  **M-Pesa**) usados no checkout de Moçambique. As alterações ficam visíveis no
+  site de imediato e cada carteira pode ser ativada ou desativada.
+- **Pedidos**: lista dos pedidos de Moçambique (carteira de destino, número de
+  origem, contacto de entrega e mensagem de confirmação) e dos pedidos PIX, com
+  ações para confirmar pagamento, marcar como entregue ou cancelar.
 - **Mensagens**: todas as conversas do chat de apoio (visitante, respostas da IA
   e pedidos de humano). O administrador escreve a resposta e esta aparece
   automaticamente no chat do visitante, com aviso de novas mensagens.
@@ -85,19 +89,21 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
    | `INFINIGATE_DEPOSIT_KEY`         | Criação de cobranças PIX                    |
    | `INFINIGATE_WEBHOOK_KEY`         | Verificação da assinatura dos webhooks      |
    | `INFINIGATE_BASE_URL`            | `https://api.infini-gate.com` (predefinido) |
-   | `EMOLA_*`                        | Números e titular da transferência e-Mola   |
+   | `EMOLA_NUMBER` / `EMOLA_HOLDER`  | Número e titular e-Mola (fallback)          |
+   | `MPESA_NUMBER` / `MPESA_HOLDER`  | Número e titular M-Pesa (fallback)          |
    | `PUBLIC_BASE_URL`                | URL pública usada nos webhooks              |
 
 2. **Base de dados**: abra o **SQL Editor** do Supabase, cole todo o conteúdo de
    [`supabase/schema.sql`](supabase/schema.sql) e clique em **RUN**.
    O script é idempotente e cria:
    - `public.products`, `public.orders`, `public.site_visits`,
-     `public.support_messages`;
+     `public.support_messages`, `public.payment_methods`;
    - o bucket **privado** `ebooks` (onde ficam os PDFs);
-   - os produtos iniciais (Beta `19,90` / Premium `399,89`).
+   - os produtos iniciais (Beta `19,90` / Premium `399,89`) e as carteiras
+     móveis **e-Mola** e **M-Pesa**.
 
    > Se já tinha executado uma versão anterior do script, volte a executá-lo
-   > para criar a tabela `support_messages` do chat de apoio. O script não
+   > para criar as tabelas `support_messages` e `payment_methods`. O script não
    > apaga dados existentes.
 
 3. **Storage**: confirme em **Storage** que o bucket `ebooks` existe e está
@@ -175,16 +181,16 @@ Adicione as variáveis em **Secrets** (ou no `.env`) e carregue em **Run**.
 supabase/schema.sql             SQL para executar no Supabase
 src/
   lib/api.ts                    Server functions (público + admin)
-  lib/catalog.server.ts         Acesso ao Supabase (produtos, pedidos, visitas, chat)
+  lib/catalog.server.ts         Acesso ao Supabase (produtos, carteiras, pedidos, visitas, chat)
   lib/infinigate.server.ts      PIX: criação de cobrança + verificação de webhook
-  lib/emola.server.ts           Destinos de transferência e-Mola
+  lib/emola.server.ts           Carteiras móveis MZ (e-Mola, M-Pesa): valores de recurso
   lib/region.server.ts          Deteção de país/moeda
   lib/admin-auth.server.ts      Credenciais + cookie de sessão HMAC
   lib/webhook.server.ts         Endpoint do webhook da InfiniGate
   lib/supabase.server.ts        Cliente Supabase (service_role)
   routes/__root.tsx             Shell + registo de visitas
   routes/index.tsx              Landing page
-  routes/checkout.tsx           Checkout (e-Mola / PIX)
+  routes/checkout.tsx           Checkout (carteira móvel / PIX)
   routes/admin.tsx              Painel de administração
   server.ts                     Wrapper SSR + webhook
   start.ts                      Middleware (CSRF + erros)

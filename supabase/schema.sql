@@ -77,6 +77,21 @@ create index if not exists orders_created_at_idx  on public.orders (created_at d
 create index if not exists orders_method_idx      on public.orders (method);
 
 -- ---------------------------------------------------------------------------
+-- 2b. Carteiras móveis (Moçambique) — número editável em /admin > Pagamentos
+--     id: 'emola' | 'mpesa'
+-- ---------------------------------------------------------------------------
+create table if not exists public.payment_methods (
+  id          text primary key,
+  label       text        not null,
+  number      text        not null,
+  holder      text        not null default '',
+  note        text        not null default '',
+  active      boolean     not null default true,
+  sort_order  integer     not null default 0,
+  updated_at  timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- 3. Visitas ao site
 -- ---------------------------------------------------------------------------
 create table if not exists public.site_visits (
@@ -140,6 +155,11 @@ create trigger products_touch_updated_at
   before update on public.products
   for each row execute function public.touch_updated_at();
 
+drop trigger if exists payment_methods_touch_updated_at on public.payment_methods;
+create trigger payment_methods_touch_updated_at
+  before update on public.payment_methods
+  for each row execute function public.touch_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- 5. Row Level Security
 --    Todo o acesso é feito pelo servidor com a service_role key, que ignora
@@ -149,6 +169,7 @@ alter table public.products    enable row level security;
 alter table public.orders      enable row level security;
 alter table public.site_visits enable row level security;
 alter table public.support_messages enable row level security;
+alter table public.payment_methods enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- 6. Storage: bucket privado para os PDFs dos ebooks
@@ -183,9 +204,33 @@ values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- 7b. Carteiras móveis iniciais (editáveis em /admin > Pagamentos)
+-- ---------------------------------------------------------------------------
+insert into public.payment_methods (id, label, number, holder, note, sort_order)
+values
+  (
+    'emola',
+    'e-Mola',
+    '8738373838',
+    'MenteExperta',
+    'Transferência e-Mola para a conta MenteExperta.',
+    1
+  ),
+  (
+    'mpesa',
+    'M-Pesa',
+    '8783838929',
+    'Experience Beta',
+    'Transferência M-Pesa para a conta MenteExperta.',
+    2
+  )
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- 8. Verificação rápida
 -- ---------------------------------------------------------------------------
 -- select * from public.products order by sort_order;
+-- select * from public.payment_methods order by sort_order;
 -- select status, count(*) from public.orders group by status;
 -- select count(*) from public.site_visits;
 -- select session_id, count(*) from public.support_messages group by session_id;

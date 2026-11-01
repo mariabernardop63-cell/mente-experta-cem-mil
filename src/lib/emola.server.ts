@@ -1,49 +1,39 @@
 import { readEnvOr } from "./env.server";
+import { FALLBACK_PAYMENT_METHODS, type PaymentMethod } from "./types";
 
 /**
- * Destinos de transferência e-Mola (Moçambique).
+ * Carteiras móveis de Moçambique: e-Mola e M-Pesa.
  *
- * Os números são configuráveis por ambiente para não ficarem presos ao código:
- *   EMOLA_PERSONAL_NUMBER / EMOLA_COMPANY_NUMBER / EMOLA_COMPANY_NAME
+ * A fonte de verdade é a tabela `payment_methods` (editável em `/admin`).
+ * Este módulo fornece apenas os valores de recurso usados quando a base de
+ * dados ainda não está configurada — e que também podem ser ajustados por
+ * ambiente, sem alterar código:
+ *   EMOLA_NUMBER / EMOLA_HOLDER / MPESA_NUMBER / MPESA_HOLDER
  */
 
-export type EmolaTarget = {
-  /** "personal" | "company" */
-  kind: "personal" | "company";
-  label: string;
-  number: string;
-  holder: string;
-  note: string;
+const ENV_BY_ID: Record<string, { number: string; holder: string }> = {
+  emola: { number: "EMOLA_NUMBER", holder: "EMOLA_HOLDER" },
+  mpesa: { number: "MPESA_NUMBER", holder: "MPESA_HOLDER" },
 };
 
-export type EmolaConfig = {
-  personal: EmolaTarget;
-  company: EmolaTarget;
-  /** Passos que o cliente MZ vê antes de submeter o comprovativo. */
-  instructions: string[];
-};
+export function walletFallback(): PaymentMethod[] {
+  return FALLBACK_PAYMENT_METHODS.map((method) => {
+    const env = ENV_BY_ID[method.id];
+    if (!env) return { ...method };
+    return {
+      ...method,
+      number: readEnvOr(env.number, method.number),
+      holder: readEnvOr(env.holder, method.holder),
+    };
+  });
+}
 
-export function emolaConfig(): EmolaConfig {
-  return {
-    personal: {
-      kind: "personal",
-      label: "Conta pessoal",
-      number: readEnvOr("EMOLA_PERSONAL_NUMBER", "8738373838"),
-      holder: readEnvOr("EMOLA_PERSONAL_HOLDER", "MenteExperta"),
-      note: "Transferência e-Mola direta para a conta pessoal.",
-    },
-    company: {
-      kind: "company",
-      label: "Conta empresa",
-      number: readEnvOr("EMOLA_COMPANY_NUMBER", "8783838929"),
-      holder: readEnvOr("EMOLA_COMPANY_NAME", "Experience Beta"),
-      note: "Use esta conta se estiver a pagar em nome de uma empresa.",
-    },
-    instructions: [
-      "Abra o seu M-Pesa / e-Mola e escolha Transferir.",
-      "Escolha o número indicado abaixo e confirme o valor exato da edição escolhida.",
-      "Copie a mensagem de confirmação que receber por SMS e cole no campo abaixo.",
-      "Submeta o pedido e indique o seu WhatsApp ou e-mail para receber o ebook.",
-    ],
-  };
+/** Passos que o cliente MZ vê antes de submeter o comprovativo. */
+export function walletInstructions(): string[] {
+  return [
+    "Abra a sua carteira móvel (e-Mola ou M-Pesa) e escolha Transferir.",
+    "Escolha o número da carteira indicada abaixo e confirme o valor exato da edição escolhida.",
+    "Copie a mensagem de confirmação que receber por SMS e cole no campo abaixo.",
+    "Submeta o pedido e indique o seu WhatsApp ou e-mail para receber o ebook.",
+  ];
 }

@@ -16,8 +16,10 @@ import {
   Send,
   ShieldCheck,
   ShoppingBag,
+  Smartphone,
   TrendingUp,
   Upload,
+  Wallet,
 } from "lucide-react";
 
 import {
@@ -30,12 +32,14 @@ import {
   adminSetOrderStatus,
   adminSupportMessages,
   adminSupportReply,
+  adminUpdatePaymentMethod,
   adminUpdatePrice,
   type AdminOverview,
 } from "@/lib/api";
 import {
   formatPrice,
   type OrderRow,
+  type PaymentMethod,
   type Product,
   type SupportMessage,
   type SupportThread,
@@ -205,7 +209,7 @@ function Login({ onSuccess }: { onSuccess: (email: string) => void }) {
   );
 }
 
-type Tab = "overview" | "products" | "orders" | "messages" | "visits";
+type Tab = "overview" | "products" | "payments" | "orders" | "messages" | "visits";
 
 function Dashboard({ email, onLogout }: { email: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -271,6 +275,7 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
           [
             ["overview", "Visão geral", BarChart3],
             ["products", "Produtos e PDFs", BookOpen],
+            ["payments", "Pagamentos", Wallet],
             ["orders", "Pedidos", ShoppingBag],
             ["messages", "Mensagens", MessagesSquare],
             ["visits", "Visitas", Eye],
@@ -305,6 +310,7 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
         <>
           {tab === "overview" ? <Overview data={data} /> : null}
           {tab === "products" ? <Products products={data.products} reload={load} /> : null}
+          {tab === "payments" ? <Payments methods={data.paymentMethods} reload={load} /> : null}
           {tab === "orders" ? <Orders orders={data.orders} reload={load} /> : null}
           {tab === "messages" ? <Messages threads={data.supportThreads} reload={load} /> : null}
           {tab === "visits" ? <Visits data={data} /> : null}
@@ -334,7 +340,7 @@ function Overview({ data }: { data: AdminOverview }) {
           icon={<Coins size={18} />}
           label="Dinheiro faturado"
           value={money(kpis.revenueBrl + kpis.revenueMz, "BRL")}
-          hint={`R$ ${formatPrice(kpis.revenueBrl)} via PIX · MT ${formatPrice(kpis.revenueMz)} via e-Mola`}
+          hint={`R$ ${formatPrice(kpis.revenueBrl)} via PIX · MT ${formatPrice(kpis.revenueMz)} via carteira móvel`}
         />
         <Kpi
           icon={<Eye size={18} />}
@@ -346,7 +352,7 @@ function Overview({ data }: { data: AdminOverview }) {
           icon={<TrendingUp size={18} />}
           label="Pedidos a tratar"
           value={String(kpis.pendingOrders + kpis.awaitingReview)}
-          hint={`${kpis.awaitingReview} e-Mola à espera · ${kpis.pendingOrders} PIX pendentes`}
+          hint={`${kpis.awaitingReview} MZ à espera · ${kpis.pendingOrders} PIX pendentes`}
         />
       </div>
 
@@ -405,7 +411,7 @@ function Products({ products, reload }: { products: Product[]; reload: () => Pro
     <div className="admin-section">
       <p className="admin-help">
         Edite o preço de cada edição e carregue o PDF que é entregue ao comprador. O mesmo PDF serve
-        os pagamentos PIX e e-Mola.
+        os pagamentos PIX e por carteira móvel.
       </p>
       <div className="admin-products">
         {products.map((product) => (
@@ -569,6 +575,136 @@ function ProductCard({ product, reload }: { product: Product; reload: () => Prom
   );
 }
 
+function Payments({ methods, reload }: { methods: PaymentMethod[]; reload: () => Promise<void> }) {
+  return (
+    <div className="admin-section">
+      <p className="admin-help">
+        Números das carteiras móveis apresentados no checkout de Moçambique. Qualquer alteração aqui
+        aparece de imediato no site, sem novo deploy.
+      </p>
+      <div className="admin-products">
+        {methods.map((method) => (
+          <PaymentCard key={method.id} method={method} reload={reload} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PaymentCard({ method, reload }: { method: PaymentMethod; reload: () => Promise<void> }) {
+  const [label, setLabel] = useState(method.label);
+  const [number, setNumber] = useState(method.number);
+  const [holder, setHolder] = useState(method.holder);
+  const [note, setNote] = useState(method.note);
+  const [active, setActive] = useState(method.active);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    setLabel(method.label);
+    setNumber(method.number);
+    setHolder(method.holder);
+    setNote(method.note);
+    setActive(method.active);
+  }, [method]);
+
+  async function save() {
+    setMessage(null);
+    setBusy(true);
+    try {
+      const result = await adminUpdatePaymentMethod({
+        data: { id: method.id, label, number, holder, note, active },
+      });
+      if (!result.ok) {
+        setMessage({ kind: "error", text: result.error });
+        return;
+      }
+      setMessage({ kind: "ok", text: "Carteira atualizada no checkout." });
+      await reload();
+    } catch {
+      setMessage({ kind: "error", text: "Falha ao guardar a carteira." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article className="admin-product">
+      <div className="admin-product-head">
+        <div>
+          <h3>
+            {method.id === "mpesa" ? <Wallet size={18} /> : <Smartphone size={18} />}
+            {label}
+          </h3>
+          <p>
+            {method.id === "emola"
+              ? "e-Mola · Moçambique"
+              : method.id === "mpesa"
+                ? "M-Pesa · Moçambique"
+                : "Carteira móvel · Moçambique"}
+          </p>
+        </div>
+        <span className={`admin-pdf-state ${active ? "ok" : ""}`}>
+          {active ? "Ativa" : "Inativa"}
+        </span>
+      </div>
+
+      <div className="admin-product-row">
+        <label className="admin-field">
+          <span>Nome da carteira</span>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            aria-label={`Nome da carteira ${method.id}`}
+          />
+        </label>
+        <label className="admin-field">
+          <span>Número</span>
+          <input
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            inputMode="tel"
+            aria-label={`Número da carteira ${label}`}
+          />
+        </label>
+        <label className="admin-field">
+          <span>Titular</span>
+          <input
+            value={holder}
+            onChange={(e) => setHolder(e.target.value)}
+            aria-label={`Titular da carteira ${label}`}
+          />
+        </label>
+      </div>
+
+      <label className="admin-field">
+        <span>Nota mostrada ao cliente</span>
+        <input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+
+      <div className="admin-product-row">
+        <label className="admin-check">
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <span>Mostrar esta carteira no checkout</span>
+        </label>
+        <button
+          type="button"
+          className="admin-btn admin-btn-primary"
+          onClick={() => void save()}
+          disabled={busy}
+        >
+          {busy ? <Loader2 size={15} className="admin-spin" /> : <Check size={15} />} Guardar
+          carteira
+        </button>
+      </div>
+
+      {message ? (
+        <p className={message.kind === "ok" ? "admin-ok" : "admin-error"}>{message.text}</p>
+      ) : null}
+    </article>
+  );
+}
+
 function Orders({ orders, reload }: { orders: OrderRow[]; reload: () => Promise<void> }) {
   const [filter, setFilter] = useState<"all" | "emola" | "pix">("emola");
   const [busy, setBusy] = useState<string | null>(null);
@@ -596,7 +732,7 @@ function Orders({ orders, reload }: { orders: OrderRow[]; reload: () => Promise<
       <div className="admin-filters">
         {(
           [
-            ["emola", "Pedidos e-Mola (MZ)"],
+            ["emola", "Pedidos MZ (carteira móvel)"],
             ["pix", "Pedidos PIX"],
             ["all", "Todos"],
           ] as const

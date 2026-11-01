@@ -1,10 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { EBOOK_BUCKET, getSupabase } from "./supabase.server";
+import { walletFallback } from "./emola.server";
 import {
+  FALLBACK_PAYMENT_METHODS,
   FALLBACK_PRODUCTS,
   type AdminKpis,
   type OrderRow,
+  type PaymentMethod,
   type Product,
   type SupportAuthor,
   type SupportMessage,
@@ -117,6 +120,92 @@ export async function createProduct(payload: {
     sort_order: 99,
   });
   return error ? error.message : null;
+}
+
+/* ------------------------------------------------- métodos de pagamento (MZ) */
+
+type PaymentMethodRow = {
+  id: string;
+  label: string;
+  number: string;
+  holder: string | null;
+  note: string | null;
+  active: boolean;
+  sort_order: number;
+};
+
+function toPaymentMethod(row: PaymentMethodRow): PaymentMethod {
+  return {
+    id: row.id,
+    label: row.label,
+    number: row.number,
+    holder: row.holder ?? "",
+    note: row.note ?? "",
+    active: Boolean(row.active),
+    sortOrder: Number(row.sort_order ?? 0),
+  };
+}
+
+/**
+ * Carteiras móveis (e-Mola, M-Pesa). O painel lê com `includeInactive` para
+ * poder reativar uma carteira; o checkout só recebe as ativas.
+ */
+export async function listPaymentMethods(
+  includeInactive = false,
+): Promise<{ configured: boolean; methods: PaymentMethod[] }> {
+  const fallback = walletFallback();
+  const db = getSupabase();
+  if (!db) return { configured: false, methods: fallback };
+
+  // Lemos sempre todas as linhas: assim distinguimos "tabela vazia" (usar
+  // valores de recurso) de "carteiras todas desativadas" (não mostrar nenhuma).
+  const { data, error } = await db
+    .from("payment_methods")
+    .select("id,label,number,holder,note,active,sort_order")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    console.error("[catalog] listPaymentMethods", error.message);
+    return { configured: true, methods: fallback };
+  }
+
+  const rows = (data ?? []) as unknown as PaymentMethodRow[];
+  if (rows.length === 0) return { configured: true, methods: fallback };
+
+  const methods = rows.map(toPaymentMethod);
+  return {
+    configured: true,
+    methods: includeInactive ? methods : methods.filter((method) => method.active),
+  };
+}
+
+export async function updatePaymentMethod(
+  id: string,
+  patch: { label: string; number: string; holder: string; note: string; active: boolean },
+): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) return "Base de dados não configurada.";
+  const order = FALLBACK_PAYMENT_METHODS.find((method) => method.id === id)?.sortOrder ?? 99;
+  const { error } = await db.from("payment_methods").upsert(
+    {
+      id,
+      label: patch.label,
+      number: patch.number,
+      holder: patch.holder,
+      note: patch.note,
+      active: patch.active,
+      sort_order: order,
+    },
+    { onConflict: "id" },
+  );
+  return error ? paymentMethodError(error) : null;
+}
+
+function paymentMethodError(error: { code?: string; message: string }): string {
+  if (error.code === "42P01") {
+    return "Tabela payment_methods em falta. Execute supabase/schema.sql no Supabase.";
+  }
+  return error.message;
 }
 
 /* ------------------------------------------------------------------ visitas */
