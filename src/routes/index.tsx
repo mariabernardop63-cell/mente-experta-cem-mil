@@ -171,7 +171,9 @@ function Index() {
         <div className="hero-content">
           <Reveal>
             <h1 className="hero-title">
-              Fazer <span>100K/R$</span> nunca foi difícil<span>.</span>
+              Fazer <span>100K/R$</span>
+              <br />
+              nunca foi difícil<span>.</span>
             </h1>
             <p className="hero-copy">
               O difícil é o tempo que leva. E encontrar um valor para começar.
