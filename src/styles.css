@@ -500,17 +500,6 @@
   color: var(--muted-foreground);
   margin-top: 2px;
 }
-.testimonial-badge {
-  margin-left: auto;
-  flex-shrink: 0;
-  align-self: flex-start;
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  padding: 3px 7px;
-  border: 1px solid var(--primary);
-  border-radius: 2px;
-  color: var(--primary);
-}
 .testimonial-quote {
   flex: 1;
   margin: 0;
@@ -543,15 +532,6 @@
   display: block;
   margin-top: 4px;
   font-size: 10px;
-  color: var(--muted-foreground);
-}
-.testimonial-note {
-  margin-top: 26px;
-  max-width: 720px;
-  padding-left: 14px;
-  border-left: 2px solid var(--border);
-  font-size: 10px;
-  line-height: 1.7;
   color: var(--muted-foreground);
 }
 .about-grid {

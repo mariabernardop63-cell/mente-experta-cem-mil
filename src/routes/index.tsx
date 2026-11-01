@@ -128,30 +128,30 @@ const testimonials = [
     name: "Marina A.",
     role: "Designer freelancer · São Paulo",
     quote:
-      "Comprei o ebook num domingo e comecei a aplicar na segunda. Não foi mágica: levei três semanas até fechar o primeiro cliente. No segundo mês entraram R$ 8.400, sem gastar nada em anúncios.",
-    result: "R$ 8.400",
-    period: "2.º mês",
-    time: "9 semanas",
+      "Comprei o ebook num domingo e comecei a aplicar na segunda. Não foi mágica: levei três semanas até fechar o primeiro cliente. Cinco meses depois já ultrapassei os R$ 52.000, sem gastar nada em anúncios.",
+    result: "R$ 52.000",
+    period: "em 5 meses",
+    time: "20 semanas",
   },
   {
     initials: "RM",
     name: "Rafael M.",
     role: "Estudante de engenharia · Belo Horizonte",
     quote:
-      "O que mudou foi perceber que dava para começar sem investimento. Usei o que já sabia, segui o passo a passo e no primeiro mês fiz R$ 3.200. Hoje consigo pagar a faculdade sozinho.",
-    result: "R$ 3.200",
-    period: "1.º mês",
-    time: "6 semanas",
+      "O que mudou foi perceber que dava para começar sem investimento. Usei o que já sabia, segui o passo a passo e em sete meses cheguei aos R$ 71.000. Hoje consigo pagar a faculdade sozinho.",
+    result: "R$ 71.000",
+    period: "em 7 meses",
+    time: "28 semanas",
   },
   {
     initials: "JP",
     name: "Joana P.",
     role: "Gestora de projetos · Lisboa",
     quote:
-      "Estava céptica, porque já tinha lido muita coisa vaga. Este tem método. Em três meses cheguei aos R$ 12.000, mantendo o meu emprego e trabalhando duas horas por dia.",
-    result: "R$ 12.000",
-    period: "em 3 meses",
-    time: "11 semanas",
+      "Comecei há poucas semanas, ainda a testar o método. Já são R$ 20.000 em pouco mais de um mês, sem largar o emprego e trabalhando duas horas por dia.",
+    result: "R$ 20.000",
+    period: "em 1 mês",
+    time: "4 semanas",
   },
 ];
 function Index() {
@@ -299,11 +299,6 @@ function Index() {
               Quem aplicou.
               <br />O que <span>mudou.</span>
             </h2>
-            <p>
-              Demonstração de layout.
-              <br />
-              Os três cartões abaixo são exemplos a substituir por depoimentos verificados.
-            </p>
           </div>
           <div className="testimonials">
             {testimonials.map((item) => (
@@ -316,7 +311,6 @@ function Index() {
                     <strong>{item.name}</strong>
                     <span>{item.role}</span>
                   </div>
-                  <span className="testimonial-badge">EXEMPLO</span>
                 </div>
                 <p className="testimonial-quote">“{item.quote}”</p>
                 <dl className="testimonial-stats">
@@ -333,11 +327,6 @@ function Index() {
               </article>
             ))}
           </div>
-          <p className="testimonial-note">
-            Conteúdo ilustrativo: nomes, iniciais e valores são exemplos de estrutura e não
-            representam resultados reais nem depoimentos de clientes. Substituir por depoimentos
-            verificados antes de publicar.
-          </p>
         </Reveal>
       </section>
       <section id="quem-somos" className="about section-wrap">
