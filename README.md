@@ -57,8 +57,11 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
   origem, contacto de entrega e mensagem de confirmação) e dos pedidos PIX, com
   ações para confirmar pagamento, marcar como entregue ou cancelar.
 - **Mensagens**: todas as conversas do chat de apoio (visitante, respostas da IA
-  e pedidos de humano). O administrador escreve a resposta e esta aparece
-  automaticamente no chat do visitante, com aviso de novas mensagens.
+  e pedidos de humano), com **atualização automática a cada 5 s** — não é preciso
+  recarregar. O administrador escreve a resposta e esta aparece automaticamente
+  no chat do visitante, com aviso de novas mensagens. No topo há um diagnóstico
+  da ligação (base de dados, tipo de chave, nº de mensagens e **teste de
+  ligação**) para identificar problemas de imediato.
 - **Visitas**: totais, países mais frequentes e registo recente.
 
 ## Requisitos
@@ -103,8 +106,12 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
      móveis **e-Mola** e **M-Pesa**.
 
    > Se já tinha executado uma versão anterior do script, volte a executá-lo
-   > para criar as tabelas `support_messages` e `payment_methods`. O script não
-   > apaga dados existentes.
+   > para criar as tabelas `support_messages` e `payment_methods` e para reparar
+   > colunas em falta na tabela do chat. O script não apaga dados existentes.
+
+   > **Importante**: `SUPABASE_SERVICE_ROLE_KEY` tem de ser a chave
+   > **service_role** (não a `anon`). O RLS está ligado e sem essa chave o chat
+   > de apoio não guarda mensagens. O painel > Mensagens mostra qual está em uso.
 
 3. **Storage**: confirme em **Storage** que o bucket `ebooks` existe e está
    privado. Não crie políticas públicas — o servidor usa a `service_role`.

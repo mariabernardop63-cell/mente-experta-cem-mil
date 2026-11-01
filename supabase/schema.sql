@@ -132,6 +132,17 @@ create index if not exists support_messages_session_idx
 create index if not exists support_messages_created_idx
   on public.support_messages (created_at desc);
 
+-- Reparação para tabelas criadas com uma versão antiga deste script:
+-- `create table if not exists` não acrescenta colunas em falta, e uma coluna
+-- ausente faz o painel de mensagens falhar em silêncio. Estas linhas são
+-- idempotentes e não apagam dados.
+alter table public.support_messages add column if not exists author     text not null default 'visitor';
+alter table public.support_messages add column if not exists kind       text not null default 'message';
+alter table public.support_messages add column if not exists admin_name text;
+alter table public.support_messages add column if not exists country    text;
+alter table public.support_messages add column if not exists page       text;
+alter table public.support_messages add column if not exists metadata   jsonb not null default '{}'::jsonb;
+
 -- ---------------------------------------------------------------------------
 -- 4. updated_at automático
 -- ---------------------------------------------------------------------------

@@ -101,22 +101,23 @@ export const askSupport = createServerFn({ method: "POST" })
     return { messages: sanitize(input), sessionId, country };
   })
   .handler(async ({ data }): Promise<SupportReply> => {
+    // Guarda a pergunta ANTES de chamar a IA: se o modelo demorar (ou falhar),
+    // a mensagem do visitante já está no painel — não se perde nada.
+    const last = data.messages.at(-1);
+    const question = data.sessionId && last?.role === "user" ? last.content : null;
+    if (question) await persistVisitorQuestion(data.sessionId, data.country, question);
+
     const result = await answer(data.messages);
 
-    const last = data.messages.at(-1);
-    if (data.sessionId && last && last.role === "user") {
-      await persistExchange(data.sessionId, data.country, last.content, result);
-    }
+    if (question && result.ok) await persistAssistantReply(data.sessionId, result.reply);
 
     return result;
   });
 
-/** Guarda a conversa para o painel poder responder. Falha em silêncio sem DB. */
-async function persistExchange(
+async function persistVisitorQuestion(
   sessionId: string,
   country: string,
   question: string,
-  result: SupportReply,
 ): Promise<void> {
   try {
     const catalog = await import("./catalog.server");
@@ -126,15 +127,17 @@ async function persistExchange(
       content: question,
       country: country || null,
     });
-    if (result.ok) {
-      await catalog.recordSupportMessage({
-        sessionId,
-        author: "assistant",
-        content: result.reply,
-      });
-    }
   } catch (error) {
-    console.error("[support-ai] persist failed", error);
+    console.error("[support-ai] persist visitor failed", error);
+  }
+}
+
+async function persistAssistantReply(sessionId: string, reply: string): Promise<void> {
+  try {
+    const catalog = await import("./catalog.server");
+    await catalog.recordSupportMessage({ sessionId, author: "assistant", content: reply });
+  } catch (error) {
+    console.error("[support-ai] persist reply failed", error);
   }
 }
 

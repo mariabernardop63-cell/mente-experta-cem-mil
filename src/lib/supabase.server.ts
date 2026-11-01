@@ -27,3 +27,30 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 export const EBOOK_BUCKET = "ebooks";
+
+/**
+ * Papel da chave Supabase configurada, sem a expor.
+ *
+ * RLS está ligado nas tabelas e só a chave `service_role` o ignora. Com a
+ * chave `anon`, as leituras voltam vazias e as escritas (mensagens do chat)
+ * falham — por isso o painel precisa de saber qual está configurada.
+ */
+export function configuredKeyRole(): "service_role" | "anon" | "unknown" {
+  const key = readEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!key) return "unknown";
+
+  if (key.startsWith("sb_secret_")) return "service_role";
+  if (key.startsWith("sb_publishable_")) return "anon";
+
+  const parts = key.split(".");
+  if (parts.length !== 3 || !parts[1]) return "unknown";
+  try {
+    const payload: unknown = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    const role = (payload as { role?: unknown }).role;
+    if (role === "service_role") return "service_role";
+    if (role === "anon") return "anon";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}

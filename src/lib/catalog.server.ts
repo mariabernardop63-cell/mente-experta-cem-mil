@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { EBOOK_BUCKET, getSupabase } from "./supabase.server";
+import {
+  EBOOK_BUCKET,
+  MISSING_SUPABASE_MESSAGE,
+  configuredKeyRole,
+  getSupabase,
+} from "./supabase.server";
 import { walletFallback } from "./emola.server";
 import {
   FALLBACK_PAYMENT_METHODS,
@@ -609,10 +614,21 @@ export async function recordSupportMessage(input: {
     country: input.country ?? null,
   });
   if (error) {
-    console.error("[catalog] recordSupportMessage", error.message);
+    console.error("[catalog] recordSupportMessage", error.code, error.message);
     return false;
   }
   return true;
+}
+
+/** Traduz erros do Postgres em instruções úteis para quem administra. */
+function supportError(error: { code?: string; message: string }): string {
+  if (error.code === "42P01") {
+    return "A tabela support_messages não existe. Execute supabase/schema.sql no SQL Editor do Supabase.";
+  }
+  if (error.code === "42501" || /permission denied|row-level security/i.test(error.message)) {
+    return "Sem permissão para ler support_messages. Confirme que SUPABASE_SERVICE_ROLE_KEY tem a chave service_role (não a anon).";
+  }
+  return `Erro na base de dados: ${error.message}`;
 }
 
 /** Respostas da equipa e avisos de sistema, para o chat do visitante. */
@@ -641,9 +657,9 @@ export async function listSupportReplies(
 export async function listSupportMessages(
   sessionId: string,
   limit = 300,
-): Promise<SupportMessage[]> {
+): Promise<{ messages: SupportMessage[]; error: string | null }> {
   const db = getSupabase();
-  if (!db) return [];
+  if (!db) return { messages: [], error: MISSING_SUPABASE_MESSAGE };
   const { data, error } = await db
     .from("support_messages")
     .select(SUPPORT_SELECT)
@@ -652,15 +668,60 @@ export async function listSupportMessages(
     .limit(limit);
   if (error) {
     console.error("[catalog] listSupportMessages", error.message);
-    return [];
+    return { messages: [], error: supportError(error) };
   }
-  return ((data ?? []) as unknown as SupportRow[]).map(toSupportMessage);
+  return { messages: ((data ?? []) as unknown as SupportRow[]).map(toSupportMessage), error: null };
+}
+
+export type SupportHealth = {
+  configured: boolean;
+  keyRole: "service_role" | "anon" | "unknown";
+  rows: number;
+  error: string | null;
+};
+
+/** Diagnóstico mostrado no painel: ligação, tipo de chave e nº de mensagens. */
+export async function supportHealth(): Promise<SupportHealth> {
+  const keyRole = configuredKeyRole();
+  const db = getSupabase();
+  if (!db) return { configured: false, keyRole, rows: 0, error: MISSING_SUPABASE_MESSAGE };
+
+  const { count, error } = await db
+    .from("support_messages")
+    .select("id", { count: "exact", head: true });
+
+  if (error) {
+    console.error("[catalog] supportHealth", error.message);
+    return { configured: true, keyRole, rows: 0, error: supportError(error) };
+  }
+  return { configured: true, keyRole, rows: count ?? 0, error: null };
+}
+
+/** Inserção com erro explícito, usada pelo teste de ligação do painel. */
+export async function probeSupportInsert(): Promise<{ ok: boolean; error: string | null }> {
+  const db = getSupabase();
+  if (!db) return { ok: false, error: MISSING_SUPABASE_MESSAGE };
+
+  const { error } = await db.from("support_messages").insert({
+    session_id: "diagnostico-painel",
+    author: "system",
+    kind: "message",
+    content: "Teste de ligação do painel de administração (pode ignorar).",
+  });
+
+  if (error) {
+    console.error("[catalog] probeSupportInsert", error.code, error.message);
+    return { ok: false, error: supportError(error) };
+  }
+  return { ok: true, error: null };
 }
 
 /** Agrupa as mensagens recentes por visitante, da mais recente para a mais antiga. */
-export async function listSupportThreads(limit = 400): Promise<SupportThread[]> {
+export async function listSupportThreads(
+  limit = 400,
+): Promise<{ threads: SupportThread[]; error: string | null }> {
   const db = getSupabase();
-  if (!db) return [];
+  if (!db) return { threads: [], error: MISSING_SUPABASE_MESSAGE };
   const { data, error } = await db
     .from("support_messages")
     .select(SUPPORT_SELECT)
@@ -668,7 +729,7 @@ export async function listSupportThreads(limit = 400): Promise<SupportThread[]> 
     .limit(limit);
   if (error) {
     console.error("[catalog] listSupportThreads", error.message);
-    return [];
+    return { threads: [], error: supportError(error) };
   }
 
   const rows = (data ?? []) as unknown as SupportRow[];
@@ -695,5 +756,5 @@ export async function listSupportThreads(limit = 400): Promise<SupportThread[]> 
     if (author === "admin") existing.admin_replies += 1;
   }
 
-  return [...threads.values()];
+  return { threads: [...threads.values()], error: null };
 }

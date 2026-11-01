@@ -28,7 +28,7 @@ const GREETING =
   "Olá! Sou o assistente da MenteExperta. Posso ajudar com dúvidas sobre os ebooks, as edições e a compra.";
 
 const SESSION_KEY = "me_support_chat_session";
-const POLL_INTERVAL_MS = 7000;
+const POLL_INTERVAL_MS = 5000;
 
 let messageSeq = 0;
 function nextId() {
@@ -65,10 +65,20 @@ export function SupportChat({ country }: { country?: string }) {
   // Identificador estável da conversa, para o painel poder responder.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let id = window.sessionStorage.getItem(SESSION_KEY);
+    let id: string | null = null;
+    try {
+      id = window.sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      // sessionStorage bloqueado (modo privado / iframe) — seguimos em memória
+      id = null;
+    }
     if (!id) {
       id = createSessionId();
-      window.sessionStorage.setItem(SESSION_KEY, id);
+      try {
+        window.sessionStorage.setItem(SESSION_KEY, id);
+      } catch {
+        // sem persistência entre recargas, mas a conversa continua a ser enviada
+      }
     }
     setSessionId(id);
   }, []);

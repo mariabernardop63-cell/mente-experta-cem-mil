@@ -94,12 +94,22 @@ export type OrderStatusResult =
     }
   | { ok: false; error: string };
 
+export type AdminSupportHealth = {
+  configured: boolean;
+  keyRole: "service_role" | "anon" | "unknown";
+  rows: number;
+  error: string | null;
+};
+
 export type AdminOverview = {
   kpis: AdminKpis;
   products: Product[];
   orders: OrderRow[];
   visits: VisitRow[];
   supportThreads: SupportThread[];
+  /** Motivo pelo qual o chat de apoio não pôde ser lido (null se estiver tudo bem). */
+  supportError: string | null;
+  supportHealth: AdminSupportHealth;
   paymentMethods: PaymentMethod[];
   databaseConfigured: boolean;
   pixConfigured: boolean;
@@ -416,13 +426,14 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
       import("./infinigate.server"),
     ]);
 
-    const [kpis, products, orders, visits, supportThreads, wallets] = await Promise.all([
+    const [kpis, products, orders, visits, wallets, threads, health] = await Promise.all([
       catalog.adminKpis(),
       catalog.listProducts(),
       catalog.listOrders(80),
       catalog.listVisits(80),
-      catalog.listSupportThreads(),
       catalog.listPaymentMethods(true),
+      catalog.listSupportThreads(),
+      catalog.supportHealth(),
     ]);
 
     if (!kpis) return { ok: false, error: "Base de dados não configurada." };
@@ -434,7 +445,9 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
         products: products.products,
         orders,
         visits,
-        supportThreads,
+        supportThreads: threads.threads,
+        supportError: threads.error,
+        supportHealth: health,
         paymentMethods: wallets.methods,
         databaseConfigured: supabase.getSupabase() !== null,
         pixConfigured: infinigate.infinigateConfigured(),
@@ -599,11 +612,35 @@ export const getSupportThread = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ messages: SupportMessage[] }> => {
     if (!data.sessionId) return { messages: [] };
     const catalog = await import("./catalog.server");
-    const messages = await catalog.listSupportMessages(data.sessionId, 120);
-    return { messages };
+    const result = await catalog.listSupportMessages(data.sessionId, 120);
+    return { messages: result.messages };
   });
 
 /* ---------------------------------------------------- chat de apoio (painel) */
+
+export type AdminThreadsResult =
+  { ok: true; threads: SupportThread[]; error: string | null } | { ok: false; error: string };
+
+/** Lista de conversas para o painel — usada pelo auto-refresh em tempo real. */
+export const adminSupportThreads = createServerFn({ method: "POST" }).handler(
+  async (): Promise<AdminThreadsResult> => {
+    if (!(await adminEmail())) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+    const catalog = await import("./catalog.server");
+    const result = await catalog.listSupportThreads();
+    return { ok: true, threads: result.threads, error: result.error };
+  },
+);
+
+/** Grava uma mensagem de teste para confirmar que o chat guarda dados. */
+export const adminSupportSelfTest = createServerFn({ method: "POST" }).handler(
+  async (): Promise<{ ok: boolean; error: string | null }> => {
+    if (!(await adminEmail())) return { ok: false, error: "Sessão expirada. Entre novamente." };
+
+    const catalog = await import("./catalog.server");
+    return catalog.probeSupportInsert();
+  },
+);
 
 export const adminSupportMessages = createServerFn({ method: "POST" })
   .validator((input: unknown) => ({
@@ -617,8 +654,9 @@ export const adminSupportMessages = createServerFn({ method: "POST" })
       if (!data.sessionId) return { ok: false, error: "Conversa inválida." };
 
       const catalog = await import("./catalog.server");
-      const messages = await catalog.listSupportMessages(data.sessionId);
-      return { ok: true, messages };
+      const result = await catalog.listSupportMessages(data.sessionId);
+      if (result.error) return { ok: false, error: result.error };
+      return { ok: true, messages: result.messages };
     },
   );
 

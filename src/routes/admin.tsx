@@ -32,9 +32,12 @@ import {
   adminSetOrderStatus,
   adminSupportMessages,
   adminSupportReply,
+  adminSupportSelfTest,
+  adminSupportThreads,
   adminUpdatePaymentMethod,
   adminUpdatePrice,
   type AdminOverview,
+  type AdminSupportHealth,
 } from "@/lib/api";
 import {
   formatPrice,
@@ -211,6 +214,9 @@ function Login({ onSuccess }: { onSuccess: (email: string) => void }) {
 
 type Tab = "overview" | "products" | "payments" | "orders" | "messages" | "visits";
 
+/** Intervalo do auto-refresh do chat de apoio no painel. */
+const LIVE_REFRESH_MS = 5000;
+
 function Dashboard({ email, onLogout }: { email: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [data, setData] = useState<AdminOverview | null>(null);
@@ -238,6 +244,33 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Tempo real: mantém a caixa de mensagens do apoio atualizada sem intervenção.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function tick() {
+      try {
+        const result = await adminSupportThreads();
+        if (cancelled) return;
+        if (!result.ok) {
+          if (result.error.includes("Sessão expirada")) onLogout();
+          return;
+        }
+        setData((prev) =>
+          prev ? { ...prev, supportThreads: result.threads, supportError: result.error } : prev,
+        );
+      } catch {
+        // rede instável — a próxima iteração tenta de novo
+      }
+    }
+
+    const timer = window.setInterval(() => void tick(), LIVE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [onLogout]);
 
   async function logout() {
     await adminLogout();
@@ -312,7 +345,14 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
           {tab === "products" ? <Products products={data.products} reload={load} /> : null}
           {tab === "payments" ? <Payments methods={data.paymentMethods} reload={load} /> : null}
           {tab === "orders" ? <Orders orders={data.orders} reload={load} /> : null}
-          {tab === "messages" ? <Messages threads={data.supportThreads} reload={load} /> : null}
+          {tab === "messages" ? (
+            <Messages
+              threads={data.supportThreads}
+              supportError={data.supportError}
+              health={data.supportHealth}
+              reload={load}
+            />
+          ) : null}
           {tab === "visits" ? <Visits data={data} /> : null}
         </>
       ) : null}
@@ -855,28 +895,117 @@ function authorLabel(author: string): string {
   }
 }
 
-function Messages({ threads, reload }: { threads: SupportThread[]; reload: () => Promise<void> }) {
+function sameThread(prev: SupportMessage[], next: SupportMessage[]): boolean {
+  if (prev.length !== next.length) return false;
+  if (prev.length === 0) return true;
+  return prev.at(-1)?.id === next.at(-1)?.id;
+}
+
+function SupportHealthStrip({
+  health,
+  onTested,
+}: {
+  health: AdminSupportHealth;
+  onTested: () => Promise<void>;
+}) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const keyOk = health.keyRole === "service_role";
+
+  async function test() {
+    setTesting(true);
+    setResult(null);
+    try {
+      const out = await adminSupportSelfTest();
+      setResult(
+        out.ok
+          ? { ok: true, text: "Ligação OK — a mensagem de teste foi guardada." }
+          : { ok: false, text: out.error ?? "Falha desconhecida." },
+      );
+      if (out.ok) await onTested();
+    } catch {
+      setResult({ ok: false, text: "Não foi possível executar o teste." });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <div className="admin-health">
+      <span className={health.configured ? "ok" : "off"}>
+        {health.configured ? "Base de dados ligada" : "Base de dados não configurada"}
+      </span>
+      <span className={keyOk ? "ok" : "off"}>
+        Chave: {health.keyRole === "unknown" ? "não identificada" : health.keyRole}
+      </span>
+      <span className="ok">{health.rows} mensagens na tabela</span>
+      <button
+        type="button"
+        className="admin-btn admin-btn-small"
+        onClick={() => void test()}
+        disabled={testing}
+      >
+        {testing ? <Loader2 size={13} className="admin-spin" /> : null} Testar ligação
+      </button>
+      {health.keyRole === "anon" ? (
+        <strong className="admin-health-warn">
+          A chave configurada é a «anon»: o RLS bloqueia as leituras e as escritas, por isso o chat
+          não guarda mensagens. Use a chave «service_role» em SUPABASE_SERVICE_ROLE_KEY.
+        </strong>
+      ) : null}
+      {health.error ? <strong className="admin-health-warn">{health.error}</strong> : null}
+      {result ? (
+        <strong className={result.ok ? "admin-health-ok" : "admin-health-warn"}>
+          {result.text}
+        </strong>
+      ) : null}
+    </div>
+  );
+}
+
+function Messages({
+  threads,
+  supportError,
+  health,
+  reload,
+}: {
+  threads: SupportThread[];
+  supportError: string | null;
+  health: AdminSupportHealth;
+  reload: () => Promise<void>;
+}) {
   const [active, setActive] = useState<string | null>(threads[0]?.session_id ?? null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
+  // Mantém sempre uma conversa selecionada quando chegam conversas novas.
   useEffect(() => {
     if (active && threads.some((thread) => thread.session_id === active)) return;
     setActive(threads[0]?.session_id ?? null);
   }, [threads, active]);
 
-  const loadThread = useCallback(async (sessionId: string) => {
-    setLoading(true);
+  const loadThread = useCallback(async (sessionId: string, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const result = await adminSupportMessages({ data: { sessionId } });
-      setMessages(result.ok ? result.messages : []);
+      if (!result.ok) {
+        setThreadError(result.error);
+        if (!silent) setMessages([]);
+        return;
+      }
+      setThreadError(null);
+      setMessages((prev) => (sameThread(prev, result.messages) ? prev : result.messages));
     } catch {
-      setMessages([]);
+      if (!silent) {
+        setMessages([]);
+        setThreadError("Não foi possível carregar a conversa.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -886,6 +1015,13 @@ function Messages({ threads, reload }: { threads: SupportThread[]; reload: () =>
       return;
     }
     void loadThread(active);
+  }, [active, loadThread]);
+
+  // Tempo real: a conversa aberta continua a atualizar-se sozinha.
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => void loadThread(active, true), LIVE_REFRESH_MS);
+    return () => window.clearInterval(timer);
   }, [active, loadThread]);
 
   async function send(event: FormEvent) {
@@ -913,24 +1049,48 @@ function Messages({ threads, reload }: { threads: SupportThread[]; reload: () =>
     }
   }
 
+  const problem = supportError ?? threadError;
+
   if (threads.length === 0) {
     return (
       <div className="admin-section">
-        <p className="admin-help">
-          Aqui aparecem todas as conversas do chat de apoio (visitantes, pedidos de humano e
-          respostas da IA). Responda e a mensagem chega ao chat do visitante.
-        </p>
-        <p className="admin-empty">Ainda não há mensagens no chat de apoio.</p>
+        <div className="admin-inbox-head">
+          <p className="admin-help">
+            Aqui aparecem todas as conversas do chat de apoio (visitantes, pedidos de humano e
+            respostas da IA). Responda e a mensagem chega ao chat do visitante.
+          </p>
+          <span className="admin-live">
+            <i /> Atualização automática
+          </span>
+        </div>
+        <SupportHealthStrip health={health} onTested={reload} />
+        {problem ? (
+          <p className="admin-error">{problem}</p>
+        ) : (
+          <p className="admin-empty">
+            Ainda não há mensagens no chat de apoio. Assim que um visitante escrever no site, a
+            conversa aparece aqui automaticamente.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="admin-section">
-      <p className="admin-help">
-        Todas as conversas do chat de apoio. Responda aqui e a resposta aparece de imediato no chat
-        do visitante.
-      </p>
+      <div className="admin-inbox-head">
+        <p className="admin-help">
+          Todas as conversas do chat de apoio. Responda aqui e a resposta aparece de imediato no
+          chat do visitante.
+        </p>
+        <span className="admin-live">
+          <i /> Atualização automática
+        </span>
+      </div>
+
+      <SupportHealthStrip health={health} onTested={reload} />
+
+      {problem ? <p className="admin-error">{problem}</p> : null}
 
       <div className="admin-inbox">
         <div className="admin-inbox-list" role="list">
@@ -955,6 +1115,9 @@ function Messages({ threads, reload }: { threads: SupportThread[]; reload: () =>
                 {new Date(thread.last_at).toLocaleString("pt-PT")} · {thread.total} mensagens ·{" "}
                 {thread.admin_replies} respostas{thread.country ? ` · ${thread.country}` : ""}
               </span>
+              {thread.last_author === "visitor" ? (
+                <span className="admin-inbox-pending">Por responder</span>
+              ) : null}
             </button>
           ))}
         </div>
