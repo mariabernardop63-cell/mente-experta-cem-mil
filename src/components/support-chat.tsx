@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Home,
   MessageCircle,
@@ -13,9 +13,10 @@ import {
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { askSupport } from "@/lib/support-ai";
+import { askSupport, type ChatMessage } from "@/lib/support-ai";
+import { getSupportReplies, getSupportThread, requestHumanSupport } from "@/lib/api";
 
-type UiRole = "user" | "assistant" | "system";
+type UiRole = "user" | "assistant" | "system" | "admin";
 
 type UiMessage = {
   id: string;
@@ -26,13 +27,22 @@ type UiMessage = {
 const GREETING =
   "Olá! Sou o assistente da MenteExperta. Posso ajudar com dúvidas sobre os ebooks, as edições e a compra.";
 
+const SESSION_KEY = "me_support_chat_session";
+const POLL_INTERVAL_MS = 7000;
+
 let messageSeq = 0;
 function nextId() {
   messageSeq += 1;
   return `m${messageSeq}`;
 }
 
-export function SupportChat() {
+function createSessionId(): string {
+  const webCrypto = typeof crypto !== "undefined" ? crypto : undefined;
+  if (webCrypto && typeof webCrypto.randomUUID === "function") return webCrypto.randomUUID();
+  return `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function SupportChat({ country }: { country?: string }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [attachment, setAttachment] = useState("");
@@ -40,8 +50,28 @@ export function SupportChat() {
   const [pending, setPending] = useState(false);
   const [humanRequested, setHumanRequested] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
   const file = useRef<HTMLInputElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
+  const lastReplyId = useRef(0);
+  const openRef = useRef(open);
+  const pollLock = useRef(false);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Identificador estável da conversa, para o painel poder responder.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let id = window.sessionStorage.getItem(SESSION_KEY);
+    if (!id) {
+      id = createSessionId();
+      window.sessionStorage.setItem(SESSION_KEY, id);
+    }
+    setSessionId(id);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -49,14 +79,100 @@ export function SupportChat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [open, messages, pending]);
 
+  // Procura respostas da equipa (admin) no servidor.
+  const pollReplies = useCallback(async () => {
+    if (!sessionId || pollLock.current) return;
+    pollLock.current = true;
+    try {
+      const result = await getSupportReplies({
+        data: { sessionId, afterId: lastReplyId.current },
+      });
+      const fresh = result.replies.filter((item) => item.id > lastReplyId.current);
+      if (fresh.length === 0) return;
+      lastReplyId.current = fresh[fresh.length - 1]!.id;
+      setMessages((prev) => [
+        ...prev,
+        ...fresh.map((item) => ({
+          id: `a${item.id}`,
+          role: "admin" as const,
+          content: item.content,
+        })),
+      ]);
+      if (!openRef.current) setUnread((count) => count + fresh.length);
+    } catch (error) {
+      console.error("[support-chat] poll failed", error);
+    } finally {
+      pollLock.current = false;
+    }
+  }, [sessionId]);
+
+  // Restaura a conversa guardada (incluindo respostas anteriores da equipa).
+  const hydrate = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const result = await getSupportThread({ data: { sessionId } });
+      if (result.messages.length === 0) return;
+
+      const restored: UiMessage[] = [];
+      let human = false;
+
+      for (const item of result.messages) {
+        if (item.kind === "human_request") {
+          if (item.author === "visitor") {
+            human = true;
+            restored.push({
+              id: `h${item.id}`,
+              role: "system",
+              content:
+                "Pedido de atendimento humano registado. A equipa TTC Corporation vê-o no painel.",
+            });
+          }
+          continue;
+        }
+        restored.push({
+          id: `h${item.id}`,
+          role: item.author === "visitor" ? "user" : item.author,
+          content: item.content,
+        });
+      }
+
+      lastReplyId.current = result.messages[result.messages.length - 1]!.id;
+      if (human) setHumanRequested(true);
+      setMessages(restored);
+    } catch (error) {
+      console.error("[support-chat] hydrate failed", error);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    let timer: number | undefined;
+
+    async function boot() {
+      await hydrate();
+      if (cancelled) return;
+      await pollReplies();
+      if (cancelled) return;
+      timer = window.setInterval(() => void pollReplies(), POLL_INTERVAL_MS);
+    }
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [sessionId, hydrate, pollReplies]);
+
   async function sendMessage() {
     const text = message.trim();
     if (!text || pending) return;
 
-    const history = [
-      ...messages.filter((m) => m.role !== "system"),
-      { role: "user" as const, content: text },
-    ];
+    const history: ChatMessage[] = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+    history.push({ role: "user", content: text });
 
     setMessages((prev) => [...prev, { id: nextId(), role: "user", content: text }]);
     setMessage("");
@@ -65,12 +181,11 @@ export function SupportChat() {
 
     try {
       const result = await askSupport({
-        data: {
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
-        },
+        data: { messages: history, sessionId: sessionId ?? "", country: country ?? "" },
       });
       setConnected(result.connected && result.ok);
       setMessages((prev) => [...prev, { id: nextId(), role: "assistant", content: result.reply }]);
+      window.setTimeout(() => void pollReplies(), 400);
     } catch (error) {
       console.error("[support-chat] send failed", error);
       setConnected(false);
@@ -88,16 +203,31 @@ export function SupportChat() {
     }
   }
 
-  function requestHuman() {
+  async function requestHuman() {
     if (humanRequested) return;
     setHumanRequested(true);
+
+    const note =
+      message.trim() || [...messages].reverse().find((m) => m.role === "user")?.content || null;
+
+    let delivered = false;
+    try {
+      const result = await requestHumanSupport({
+        data: { sessionId: sessionId ?? "", note, country: country ?? null },
+      });
+      delivered = result.ok && result.delivered;
+    } catch (error) {
+      console.error("[support-chat] human request failed", error);
+    }
+
     setMessages((prev) => [
       ...prev,
       {
         id: nextId(),
         role: "system",
-        content:
-          "Pedido enviado. O seu pedido de atendimento humano ficou registado. A entrega para um atendente ainda não está configurada neste ambiente — a equipa TTC Corporation verá o pedido assim que o canal estiver ligado.",
+        content: delivered
+          ? "Pedido enviado. A equipa TTC Corporation recebeu o seu pedido e vê-o no painel. Assim que responderem, a resposta aparece aqui neste chat."
+          : "O canal de atendimento humano ainda não está ligado neste ambiente, por isso o pedido não chegou à equipa. Pode continuar a falar com o assistente automático.",
       },
     ]);
   }
@@ -131,7 +261,7 @@ export function SupportChat() {
               <button
                 type="button"
                 className="support-tab"
-                onClick={requestHuman}
+                onClick={() => void requestHuman()}
                 disabled={humanRequested}
                 aria-label={humanRequested ? "Pedido de humano enviado" : "Pedir humano"}
               >
@@ -173,14 +303,21 @@ export function SupportChat() {
               <div key={m.id} className={`support-row support-row-${m.role}`}>
                 {m.role !== "user" && (
                   <span className="support-mini-logo" aria-hidden="true">
-                    {m.role === "system" ? (
-                      <img src="/ttc-logo.png" alt="" />
-                    ) : (
+                    {m.role === "assistant" ? (
                       <Headset size={15} strokeWidth={2.2} />
+                    ) : (
+                      <img src="/ttc-logo.png" alt="" />
                     )}
                   </span>
                 )}
-                <p className={`support-bubble support-bubble-${m.role}`}>{m.content}</p>
+                {m.role === "admin" ? (
+                  <div className="support-bubble-wrap">
+                    <span className="support-admin-label">Equipa MenteExperta</span>
+                    <p className="support-bubble support-bubble-admin">{m.content}</p>
+                  </div>
+                ) : (
+                  <p className={`support-bubble support-bubble-${m.role}`}>{m.content}</p>
+                )}
               </div>
             ))}
             {pending && (
@@ -282,9 +419,17 @@ export function SupportChat() {
       <Button
         className="support-launcher"
         aria-label={open ? "Minimizar chat" : "Abrir chat"}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) setUnread(0);
+        }}
       >
         {open ? <ChevronDown /> : <MessageCircle fill="currentColor" />}
+        {!open && unread > 0 ? (
+          <span className="support-badge" aria-label={`${unread} novas mensagens`}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        ) : null}
       </Button>
     </div>
   );

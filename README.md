@@ -24,7 +24,8 @@ Construída com React 19, TanStack Start (SSR), Tailwind CSS 4 e Supabase.
   demonstração — ver `src/routes/index.tsx`), "Quem somos" e contactos.
 - **Moeda por região**: se o visitante vier de **Moçambique** os preços mantêm o
   mesmo valor mas mostram **MT**; qualquer outro país mostra **R$**.
-- Widget de apoio com IA (TokenHarbor), independente do tema escuro.
+- Widget de apoio com IA (TokenHarbor), independente do tema escuro. As conversas
+  ficam guardadas e podem ser respondidas por um humano no painel.
 
 ### Checkout (`/checkout?edition=beta|premium`)
 
@@ -51,6 +52,9 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
 - **Pedidos**: lista dos pedidos e-Mola (número de origem, destino, contacto de
   entrega e mensagem de confirmação) e dos pedidos PIX, com ações para confirmar
   pagamento, marcar como entregue ou cancelar.
+- **Mensagens**: todas as conversas do chat de apoio (visitante, respostas da IA
+  e pedidos de humano). O administrador escreve a resposta e esta aparece
+  automaticamente no chat do visitante, com aviso de novas mensagens.
 - **Visitas**: totais, países mais frequentes e registo recente.
 
 ## Requisitos
@@ -87,9 +91,14 @@ e por um cookie de sessão `HttpOnly` assinado com HMAC (12 h).
 2. **Base de dados**: abra o **SQL Editor** do Supabase, cole todo o conteúdo de
    [`supabase/schema.sql`](supabase/schema.sql) e clique em **RUN**.
    O script é idempotente e cria:
-   - `public.products`, `public.orders`, `public.site_visits`;
+   - `public.products`, `public.orders`, `public.site_visits`,
+     `public.support_messages`;
    - o bucket **privado** `ebooks` (onde ficam os PDFs);
    - os produtos iniciais (Beta `19,90` / Premium `399,89`).
+
+   > Se já tinha executado uma versão anterior do script, volte a executá-lo
+   > para criar a tabela `support_messages` do chat de apoio. O script não
+   > apaga dados existentes.
 
 3. **Storage**: confirme em **Storage** que o bucket `ebooks` existe e está
    privado. Não crie políticas públicas — o servidor usa a `service_role`.
@@ -166,7 +175,7 @@ Adicione as variáveis em **Secrets** (ou no `.env`) e carregue em **Run**.
 supabase/schema.sql             SQL para executar no Supabase
 src/
   lib/api.ts                    Server functions (público + admin)
-  lib/catalog.server.ts         Acesso ao Supabase (produtos, pedidos, visitas)
+  lib/catalog.server.ts         Acesso ao Supabase (produtos, pedidos, visitas, chat)
   lib/infinigate.server.ts      PIX: criação de cobrança + verificação de webhook
   lib/emola.server.ts           Destinos de transferência e-Mola
   lib/region.server.ts          Deteção de país/moeda

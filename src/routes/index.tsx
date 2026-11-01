@@ -170,12 +170,9 @@ function Index() {
         <div className="hero-shade" />
         <div className="hero-content">
           <Reveal>
-            <h1>
-              MenteExperta<span>.</span>
+            <h1 className="hero-title">
+              Fazer <span>100K/R$</span> nunca foi difícil<span>.</span>
             </h1>
-            <p className="hero-heading">
-              Fazer <span>100K/R$</span> nunca foi difícil.
-            </p>
             <p className="hero-copy">
               O difícil é o tempo que leva. E encontrar um valor para começar.
             </p>
@@ -420,7 +417,7 @@ function Index() {
           Voltar ao topo <ArrowRight size={16} />
         </a>
       </footer>
-      <SupportChat />
+      <SupportChat country={region.country} />
     </main>
   );
 }

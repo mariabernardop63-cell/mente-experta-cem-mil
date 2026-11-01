@@ -6,6 +6,9 @@ import {
   type AdminKpis,
   type OrderRow,
   type Product,
+  type SupportAuthor,
+  type SupportMessage,
+  type SupportThread,
   type VisitRow,
 } from "./types";
 
@@ -464,4 +467,144 @@ export async function createSignedUpload(
   }
   void contentType;
   return { ok: true, path, signedUrl: data.signedUrl };
+}
+
+/* ---------------------------------------------------- chat de apoio (TTC) */
+
+type SupportRow = {
+  id: number;
+  created_at: string;
+  session_id: string;
+  author: string;
+  kind: string;
+  content: string;
+  admin_name: string | null;
+  country: string | null;
+};
+
+const SUPPORT_SELECT = "id,created_at,session_id,author,kind,content,admin_name,country";
+
+function toSupportAuthor(value: string): SupportAuthor {
+  return value === "visitor" || value === "assistant" || value === "admin" ? value : "system";
+}
+
+function toSupportMessage(row: SupportRow): SupportMessage {
+  return {
+    id: Number(row.id),
+    created_at: row.created_at,
+    session_id: row.session_id,
+    author: toSupportAuthor(row.author),
+    kind: row.kind === "human_request" ? "human_request" : "message",
+    content: row.content,
+    admin_name: row.admin_name,
+  };
+}
+
+/** Guarda uma mensagem do chat de apoio. Devolve `false` se não houver DB. */
+export async function recordSupportMessage(input: {
+  sessionId: string;
+  author: SupportAuthor;
+  content: string;
+  kind?: "message" | "human_request";
+  adminName?: string | null;
+  country?: string | null;
+}): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+  const { error } = await db.from("support_messages").insert({
+    session_id: input.sessionId,
+    author: input.author,
+    kind: input.kind ?? "message",
+    content: input.content,
+    admin_name: input.adminName ?? null,
+    country: input.country ?? null,
+  });
+  if (error) {
+    console.error("[catalog] recordSupportMessage", error.message);
+    return false;
+  }
+  return true;
+}
+
+/** Respostas da equipa e avisos de sistema, para o chat do visitante. */
+export async function listSupportReplies(
+  sessionId: string,
+  afterId: number,
+): Promise<SupportMessage[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  const { data, error } = await db
+    .from("support_messages")
+    .select(SUPPORT_SELECT)
+    .eq("session_id", sessionId)
+    .in("author", ["admin", "system"])
+    .gt("id", afterId)
+    .order("id", { ascending: true })
+    .limit(60);
+  if (error) {
+    console.error("[catalog] listSupportReplies", error.message);
+    return [];
+  }
+  return ((data ?? []) as unknown as SupportRow[]).map(toSupportMessage);
+}
+
+/** Conversa completa de um visitante (para o painel). */
+export async function listSupportMessages(
+  sessionId: string,
+  limit = 300,
+): Promise<SupportMessage[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  const { data, error } = await db
+    .from("support_messages")
+    .select(SUPPORT_SELECT)
+    .eq("session_id", sessionId)
+    .order("id", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[catalog] listSupportMessages", error.message);
+    return [];
+  }
+  return ((data ?? []) as unknown as SupportRow[]).map(toSupportMessage);
+}
+
+/** Agrupa as mensagens recentes por visitante, da mais recente para a mais antiga. */
+export async function listSupportThreads(limit = 400): Promise<SupportThread[]> {
+  const db = getSupabase();
+  if (!db) return [];
+  const { data, error } = await db
+    .from("support_messages")
+    .select(SUPPORT_SELECT)
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[catalog] listSupportThreads", error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as unknown as SupportRow[];
+  const threads = new Map<string, SupportThread>();
+
+  for (const row of rows) {
+    const author = toSupportAuthor(row.author);
+    const existing = threads.get(row.session_id);
+    if (!existing) {
+      threads.set(row.session_id, {
+        session_id: row.session_id,
+        last_at: row.created_at,
+        total: 1,
+        human_requested: row.kind === "human_request",
+        last_content: row.content,
+        last_author: author,
+        country: row.country,
+        admin_replies: author === "admin" ? 1 : 0,
+      });
+      continue;
+    }
+    existing.total += 1;
+    if (row.kind === "human_request") existing.human_requested = true;
+    if (author === "admin") existing.admin_replies += 1;
+  }
+
+  return [...threads.values()];
 }

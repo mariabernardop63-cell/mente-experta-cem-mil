@@ -93,77 +93,120 @@ function extractError(payload: unknown): string {
 }
 
 export const askSupport = createServerFn({ method: "POST" })
-  .validator((input: unknown) => ({ messages: sanitize(input) }))
+  .validator((input: unknown) => {
+    const raw = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+    const sessionId =
+      typeof raw["sessionId"] === "string" ? raw["sessionId"].trim().slice(0, 120) : "";
+    const country = typeof raw["country"] === "string" ? raw["country"].trim().slice(0, 8) : "";
+    return { messages: sanitize(input), sessionId, country };
+  })
   .handler(async ({ data }): Promise<SupportReply> => {
-    loadEnvFile();
-
-    const apiKey = process.env["TOKENHARBOR_API_KEY"]?.trim();
-    if (!apiKey) {
-      return { ok: false, connected: false, reply: NOT_CONNECTED_REPLY };
-    }
+    const result = await answer(data.messages);
 
     const last = data.messages.at(-1);
-    if (!last || last.role !== "user") {
-      return {
-        ok: false,
-        connected: true,
-        reply: "Escreva a sua mensagem para que eu possa ajudar.",
-      };
+    if (data.sessionId && last && last.role === "user") {
+      await persistExchange(data.sessionId, data.country, last.content, result);
     }
 
-    const baseUrl = (process.env["TOKENHARBOR_BASE_URL"] ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
-    const model = process.env["TOKENHARBOR_MODEL"] ?? DEFAULT_MODEL;
+    return result;
+  });
 
-    try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...data.messages],
-          max_tokens: 600,
-          temperature: 0.6,
-        }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+/** Guarda a conversa para o painel poder responder. Falha em silêncio sem DB. */
+async function persistExchange(
+  sessionId: string,
+  country: string,
+  question: string,
+  result: SupportReply,
+): Promise<void> {
+  try {
+    const catalog = await import("./catalog.server");
+    await catalog.recordSupportMessage({
+      sessionId,
+      author: "visitor",
+      content: question,
+      country: country || null,
+    });
+    if (result.ok) {
+      await catalog.recordSupportMessage({
+        sessionId,
+        author: "assistant",
+        content: result.reply,
       });
+    }
+  } catch (error) {
+    console.error("[support-ai] persist failed", error);
+  }
+}
 
-      const payload: unknown = await response.json().catch(() => null);
+async function answer(messages: ChatMessage[]): Promise<SupportReply> {
+  loadEnvFile();
 
-      if (!response.ok) {
-        console.error(
-          "[support-ai] TokenHarbor error",
-          response.status,
-          extractError(payload) || response.statusText,
-        );
-        return {
-          ok: false,
-          connected: true,
-          reply:
-            "Não consegui obter resposta do atendimento automático agora. Tente novamente dentro de instantes ou use «Pedir humano».",
-        };
-      }
+  const apiKey = process.env["TOKENHARBOR_API_KEY"]?.trim();
+  if (!apiKey) {
+    return { ok: false, connected: false, reply: NOT_CONNECTED_REPLY };
+  }
 
-      const reply = extractReply(payload);
-      if (!reply) {
-        return {
-          ok: false,
-          connected: true,
-          reply:
-            "O atendimento automático devolveu uma resposta vazia. Tente reformular a pergunta.",
-        };
-      }
+  const last = messages.at(-1);
+  if (!last || last.role !== "user") {
+    return {
+      ok: false,
+      connected: true,
+      reply: "Escreva a sua mensagem para que eu possa ajudar.",
+    };
+  }
 
-      return { ok: true, connected: true, reply };
-    } catch (error) {
-      console.error("[support-ai] request failed", error);
+  const baseUrl = (process.env["TOKENHARBOR_BASE_URL"] ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const model = process.env["TOKENHARBOR_MODEL"] ?? DEFAULT_MODEL;
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        max_tokens: 600,
+        temperature: 0.6,
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+
+    const payload: unknown = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      console.error(
+        "[support-ai] TokenHarbor error",
+        response.status,
+        extractError(payload) || response.statusText,
+      );
       return {
         ok: false,
         connected: true,
         reply:
-          "Não foi possível contactar o atendimento automático. Verifique a ligação e tente novamente.",
+          "Não consegui obter resposta do atendimento automático agora. Tente novamente dentro de instantes ou use «Pedir humano».",
       };
     }
-  });
+
+    const reply = extractReply(payload);
+    if (!reply) {
+      return {
+        ok: false,
+        connected: true,
+        reply: "O atendimento automático devolveu uma resposta vazia. Tente reformular a pergunta.",
+      };
+    }
+
+    return { ok: true, connected: true, reply };
+  } catch (error) {
+    console.error("[support-ai] request failed", error);
+    return {
+      ok: false,
+      connected: true,
+      reply:
+        "Não foi possível contactar o atendimento automático. Verifique a ligação e tente novamente.",
+    };
+  }
+}

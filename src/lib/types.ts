@@ -52,6 +52,29 @@ export type VisitRow = {
   referrer: string | null;
 };
 
+export type SupportAuthor = "visitor" | "assistant" | "admin" | "system";
+
+export type SupportMessage = {
+  id: number;
+  created_at: string;
+  session_id: string;
+  author: SupportAuthor;
+  kind: "message" | "human_request";
+  content: string;
+  admin_name: string | null;
+};
+
+export type SupportThread = {
+  session_id: string;
+  last_at: string;
+  total: number;
+  human_requested: boolean;
+  last_content: string;
+  last_author: SupportAuthor;
+  country: string | null;
+  admin_replies: number;
+};
+
 export type AdminKpis = {
   confirmedSales: number;
   revenueBrl: number;

@@ -10,8 +10,10 @@ import {
   Loader2,
   LogOut,
   Lock,
+  MessagesSquare,
   Package,
   RefreshCw,
+  Send,
   ShieldCheck,
   ShoppingBag,
   TrendingUp,
@@ -26,10 +28,18 @@ import {
   adminOverview,
   adminSession,
   adminSetOrderStatus,
+  adminSupportMessages,
+  adminSupportReply,
   adminUpdatePrice,
   type AdminOverview,
 } from "@/lib/api";
-import { formatPrice, type OrderRow, type Product } from "@/lib/types";
+import {
+  formatPrice,
+  type OrderRow,
+  type Product,
+  type SupportMessage,
+  type SupportThread,
+} from "@/lib/types";
 
 export const Route = createFileRoute("/admin")({
   loader: () => adminSession(),
@@ -195,7 +205,7 @@ function Login({ onSuccess }: { onSuccess: (email: string) => void }) {
   );
 }
 
-type Tab = "overview" | "products" | "orders" | "visits";
+type Tab = "overview" | "products" | "orders" | "messages" | "visits";
 
 function Dashboard({ email, onLogout }: { email: string; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -231,6 +241,7 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
   }
 
   const kpis = data?.kpis;
+  const humanRequests = data?.supportThreads.filter((t) => t.human_requested).length ?? 0;
 
   return (
     <div className="admin-body">
@@ -261,6 +272,7 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
             ["overview", "Visão geral", BarChart3],
             ["products", "Produtos e PDFs", BookOpen],
             ["orders", "Pedidos", ShoppingBag],
+            ["messages", "Mensagens", MessagesSquare],
             ["visits", "Visitas", Eye],
           ] as const
         ).map(([key, label, Icon]) => (
@@ -273,6 +285,9 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
             <Icon size={15} /> {label}
             {key === "orders" && kpis && kpis.awaitingReview > 0 ? (
               <em className="admin-dot">{kpis.awaitingReview}</em>
+            ) : null}
+            {key === "messages" && humanRequests > 0 ? (
+              <em className="admin-dot">{humanRequests}</em>
             ) : null}
           </button>
         ))}
@@ -291,6 +306,7 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
           {tab === "overview" ? <Overview data={data} /> : null}
           {tab === "products" ? <Products products={data.products} reload={load} /> : null}
           {tab === "orders" ? <Orders orders={data.orders} reload={load} /> : null}
+          {tab === "messages" ? <Messages threads={data.supportThreads} reload={load} /> : null}
           {tab === "visits" ? <Visits data={data} /> : null}
         </>
       ) : null}
@@ -686,6 +702,179 @@ function Orders({ orders, reload }: { orders: OrderRow[]; reload: () => Promise<
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function authorLabel(author: string): string {
+  switch (author) {
+    case "visitor":
+      return "Visitante";
+    case "assistant":
+      return "Assistente IA";
+    case "admin":
+      return "Equipa MenteExperta";
+    default:
+      return "Sistema";
+  }
+}
+
+function Messages({ threads, reload }: { threads: SupportThread[]; reload: () => Promise<void> }) {
+  const [active, setActive] = useState<string | null>(threads[0]?.session_id ?? null);
+  const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [reply, setReply] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (active && threads.some((thread) => thread.session_id === active)) return;
+    setActive(threads[0]?.session_id ?? null);
+  }, [threads, active]);
+
+  const loadThread = useCallback(async (sessionId: string) => {
+    setLoading(true);
+    try {
+      const result = await adminSupportMessages({ data: { sessionId } });
+      setMessages(result.ok ? result.messages : []);
+    } catch {
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active) {
+      setMessages([]);
+      return;
+    }
+    void loadThread(active);
+  }, [active, loadThread]);
+
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    if (!active) return;
+    const content = reply.trim();
+    if (!content || busy) return;
+
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const result = await adminSupportReply({ data: { sessionId: active, content } });
+      if (!result.ok) {
+        setFeedback({ kind: "error", text: result.error });
+        return;
+      }
+      setReply("");
+      setFeedback({ kind: "ok", text: "Resposta enviada para o chat do visitante." });
+      await loadThread(active);
+      await reload();
+    } catch {
+      setFeedback({ kind: "error", text: "Falha ao enviar a resposta." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (threads.length === 0) {
+    return (
+      <div className="admin-section">
+        <p className="admin-help">
+          Aqui aparecem todas as conversas do chat de apoio (visitantes, pedidos de humano e
+          respostas da IA). Responda e a mensagem chega ao chat do visitante.
+        </p>
+        <p className="admin-empty">Ainda não há mensagens no chat de apoio.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-section">
+      <p className="admin-help">
+        Todas as conversas do chat de apoio. Responda aqui e a resposta aparece de imediato no chat
+        do visitante.
+      </p>
+
+      <div className="admin-inbox">
+        <div className="admin-inbox-list" role="list">
+          {threads.map((thread) => (
+            <button
+              type="button"
+              key={thread.session_id}
+              role="listitem"
+              className={`admin-inbox-item${active === thread.session_id ? " active" : ""}`}
+              onClick={() => setActive(thread.session_id)}
+            >
+              <span className="admin-inbox-item-top">
+                <strong>Visitante {thread.session_id.slice(0, 8)}</strong>
+                {thread.human_requested ? (
+                  <em className="admin-inbox-human">Pediu humano</em>
+                ) : null}
+              </span>
+              <span className="admin-inbox-preview">
+                {authorLabel(thread.last_author)}: {thread.last_content}
+              </span>
+              <span className="admin-inbox-meta">
+                {new Date(thread.last_at).toLocaleString("pt-PT")} · {thread.total} mensagens ·{" "}
+                {thread.admin_replies} respostas{thread.country ? ` · ${thread.country}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="admin-inbox-thread">
+          {loading ? (
+            <div className="admin-loading">
+              <Loader2 size={18} className="admin-spin" /> A carregar conversa...
+            </div>
+          ) : messages.length === 0 ? (
+            <p className="admin-empty">Esta conversa ainda não tem mensagens.</p>
+          ) : (
+            <div className="admin-inbox-transcript">
+              {messages.map((item) => (
+                <article key={item.id} className={`admin-msg admin-msg-${item.author}`}>
+                  <span className="admin-msg-head">
+                    {authorLabel(item.author)}
+                    {item.admin_name ? ` · ${item.admin_name}` : ""}
+                    <em>{new Date(item.created_at).toLocaleString("pt-PT")}</em>
+                  </span>
+                  {item.kind === "human_request" ? (
+                    <span className="admin-msg-tag">Pedido de atendimento humano</span>
+                  ) : null}
+                  <p>{item.content}</p>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <form className="admin-reply" onSubmit={send}>
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="Escreva a resposta para o visitante..."
+              rows={3}
+              aria-label="Resposta ao visitante"
+              disabled={busy}
+            />
+            <div className="admin-reply-actions">
+              <button
+                type="submit"
+                className="admin-btn admin-btn-primary"
+                disabled={busy || !reply.trim()}
+              >
+                {busy ? <Loader2 size={15} className="admin-spin" /> : <Send size={15} />} Enviar
+                resposta
+              </button>
+              {feedback ? (
+                <span className={feedback.kind === "ok" ? "admin-ok" : "admin-error"}>
+                  {feedback.text}
+                </span>
+              ) : null}
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

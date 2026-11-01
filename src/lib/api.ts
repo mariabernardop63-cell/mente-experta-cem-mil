@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import type { AdminKpis, OrderRow, Product, Region, VisitRow } from "./types";
+import type {
+  AdminKpis,
+  OrderRow,
+  Product,
+  Region,
+  SupportMessage,
+  SupportThread,
+  VisitRow,
+} from "./types";
 
 /**
  * Funções de servidor (RPC) usadas pelo site.
@@ -28,6 +36,12 @@ function money(value: unknown): number | null {
   const n = typeof value === "number" ? value : Number(str(value, 20)?.replace(",", "."));
   if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) return null;
   return Math.round(n * 100) / 100;
+}
+
+function nonNegative(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.trunc(n);
 }
 
 /* ------------------------------------------------------------------- tipos */
@@ -88,6 +102,7 @@ export type AdminOverview = {
   products: Product[];
   orders: OrderRow[];
   visits: VisitRow[];
+  supportThreads: SupportThread[];
   databaseConfigured: boolean;
   pixConfigured: boolean;
 };
@@ -417,11 +432,12 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
       import("./infinigate.server"),
     ]);
 
-    const [kpis, products, orders, visits] = await Promise.all([
+    const [kpis, products, orders, visits, supportThreads] = await Promise.all([
       catalog.adminKpis(),
       catalog.listProducts(),
       catalog.listOrders(80),
       catalog.listVisits(80),
+      catalog.listSupportThreads(),
     ]);
 
     if (!kpis) return { ok: false, error: "Base de dados não configurada." };
@@ -433,6 +449,7 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(
         products: products.products,
         orders,
         visits,
+        supportThreads,
         databaseConfigured: supabase.getSupabase() !== null,
         pixConfigured: infinigate.infinigateConfigured(),
       },
@@ -515,4 +532,107 @@ export const adminSetOrderStatus = createServerFn({ method: "POST" })
     const catalog = await import("./catalog.server");
     const error = await catalog.setOrderStatus(data.orderId, data.status);
     return error ? { ok: false, error } : { ok: true };
+  });
+
+/* ------------------------------------------------------- chat de apoio (público) */
+
+export type HumanRequestResult = { ok: true; delivered: boolean } | { ok: false; error: string };
+
+export const requestHumanSupport = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = record(input);
+    return {
+      sessionId: str(raw["sessionId"], 120) ?? "",
+      note: str(raw["note"], 1500),
+      country: str(raw["country"], 8),
+    };
+  })
+  .handler(async ({ data }): Promise<HumanRequestResult> => {
+    if (!data.sessionId) return { ok: false, error: "Conversa não identificada." };
+
+    const catalog = await import("./catalog.server");
+    const delivered = await catalog.recordSupportMessage({
+      sessionId: data.sessionId,
+      author: "visitor",
+      kind: "human_request",
+      content: data.note ?? "Pedido de atendimento humano pelo chat de apoio.",
+      country: data.country,
+    });
+    return { ok: true, delivered };
+  });
+
+export const getSupportReplies = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = record(input);
+    return {
+      sessionId: str(raw["sessionId"], 120) ?? "",
+      afterId: nonNegative(raw["afterId"]),
+    };
+  })
+  .handler(async ({ data }): Promise<{ replies: SupportMessage[] }> => {
+    if (!data.sessionId) return { replies: [] };
+    const catalog = await import("./catalog.server");
+    const replies = await catalog.listSupportReplies(data.sessionId, data.afterId);
+    return { replies };
+  });
+
+/** Conversa completa do próprio visitante, para restaurar o chat ao reabrir. */
+export const getSupportThread = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({
+    sessionId: str(record(input)["sessionId"], 120) ?? "",
+  }))
+  .handler(async ({ data }): Promise<{ messages: SupportMessage[] }> => {
+    if (!data.sessionId) return { messages: [] };
+    const catalog = await import("./catalog.server");
+    const messages = await catalog.listSupportMessages(data.sessionId, 120);
+    return { messages };
+  });
+
+/* ---------------------------------------------------- chat de apoio (painel) */
+
+export const adminSupportMessages = createServerFn({ method: "POST" })
+  .validator((input: unknown) => ({
+    sessionId: str(record(input)["sessionId"], 120) ?? "",
+  }))
+  .handler(
+    async ({
+      data,
+    }): Promise<{ ok: true; messages: SupportMessage[] } | { ok: false; error: string }> => {
+      if (!(await adminEmail())) return { ok: false, error: "Sessão expirada. Entre novamente." };
+      if (!data.sessionId) return { ok: false, error: "Conversa inválida." };
+
+      const catalog = await import("./catalog.server");
+      const messages = await catalog.listSupportMessages(data.sessionId);
+      return { ok: true, messages };
+    },
+  );
+
+export const adminSupportReply = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = record(input);
+    return {
+      sessionId: str(raw["sessionId"], 120) ?? "",
+      content: str(raw["content"], 2000) ?? "",
+    };
+  })
+  .handler(async ({ data }): Promise<ActionResult> => {
+    const email = await adminEmail();
+    if (!email) return { ok: false, error: "Sessão expirada. Entre novamente." };
+    if (!data.sessionId) return { ok: false, error: "Conversa inválida." };
+    if (!data.content) return { ok: false, error: "Escreva uma resposta." };
+
+    const catalog = await import("./catalog.server");
+    const stored = await catalog.recordSupportMessage({
+      sessionId: data.sessionId,
+      author: "admin",
+      content: data.content,
+      adminName: email,
+    });
+    if (!stored) {
+      return {
+        ok: false,
+        error: "Não foi possível guardar a resposta. Verifique a base de dados.",
+      };
+    }
+    return { ok: true };
   });

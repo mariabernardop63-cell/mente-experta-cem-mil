@@ -94,6 +94,30 @@ create index if not exists site_visits_created_at_idx on public.site_visits (cre
 create index if not exists site_visits_session_idx    on public.site_visits (session_id);
 
 -- ---------------------------------------------------------------------------
+-- 3b. Mensagens do chat de apoio (widget TTC Corporation)
+--     Cada visitante tem um thread identificado pelo session_id do chat.
+--     author: 'visitor' | 'assistant' (IA) | 'admin' (equipa) | 'system'
+--     kind:   'message' | 'human_request'
+-- ---------------------------------------------------------------------------
+create table if not exists public.support_messages (
+  id          bigserial primary key,
+  created_at  timestamptz not null default now(),
+  session_id  text        not null,
+  author      text        not null default 'visitor',
+  kind        text        not null default 'message',
+  content     text        not null,
+  admin_name  text,
+  country     text,
+  page        text,
+  metadata    jsonb       not null default '{}'::jsonb
+);
+
+create index if not exists support_messages_session_idx
+  on public.support_messages (session_id, created_at);
+create index if not exists support_messages_created_idx
+  on public.support_messages (created_at desc);
+
+-- ---------------------------------------------------------------------------
 -- 4. updated_at automático
 -- ---------------------------------------------------------------------------
 create or replace function public.touch_updated_at()
@@ -124,6 +148,7 @@ create trigger products_touch_updated_at
 alter table public.products    enable row level security;
 alter table public.orders      enable row level security;
 alter table public.site_visits enable row level security;
+alter table public.support_messages enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- 6. Storage: bucket privado para os PDFs dos ebooks
@@ -163,3 +188,4 @@ on conflict (id) do nothing;
 -- select * from public.products order by sort_order;
 -- select status, count(*) from public.orders group by status;
 -- select count(*) from public.site_visits;
+-- select session_id, count(*) from public.support_messages group by session_id;
