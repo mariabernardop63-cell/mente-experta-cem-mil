@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { trackVisit } from "../lib/api";
 
 function NotFoundComponent() {
   return (
@@ -90,7 +91,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "alternate icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,
@@ -116,10 +118,40 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useVisitTracking();
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
   );
+}
+
+/**
+ * Regista uma visita por sessão do browser. A localização é detetada no
+ * servidor (cabeçalhos do edge ou lookup por IP), por isso aqui só enviamos o
+ * caminho e a origem. O `sessionStorage` evita contar a mesma sessão duas vezes.
+ */
+function useVisitTracking() {
+  useEffect(() => {
+    try {
+      const key = "me_visit_logged";
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "1");
+
+      const sessionId = crypto.randomUUID();
+      void trackVisit({
+        data: {
+          path: window.location.pathname,
+          referrer: document.referrer || null,
+          sessionId,
+        },
+      }).catch(() => {
+        window.sessionStorage.removeItem(key);
+      });
+    } catch {
+      // sessionStorage indisponível (modo privado) — apenas ignoramos.
+    }
+  }, []);
 }

@@ -47,6 +47,14 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Webhook da InfiniGate: rota HTTP própria, fora do router do Start.
+      const { pathname } = new URL(request.url);
+      if (pathname.startsWith("/api/webhooks/")) {
+        const { handleInfinigateWebhook } = await import("./lib/webhook.server");
+        const handled = await handleInfinigateWebhook(request);
+        if (handled) return handled;
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

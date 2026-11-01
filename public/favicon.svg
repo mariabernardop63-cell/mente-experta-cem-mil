@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MenteExperta">
+  <rect width="64" height="64" rx="14" fill="#0f0f0f" />
+  <g transform="translate(32 32) skewX(-16) translate(-32 -32)" fill="#3ddc84">
+    <rect x="17" y="19" width="7" height="27" rx="1.5" />
+    <rect x="28" y="26" width="7" height="20" rx="1.5" />
+    <rect x="39" y="15" width="7" height="34" rx="1.5" />
+  </g>
+</svg>

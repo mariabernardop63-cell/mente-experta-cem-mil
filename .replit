@@ -1,7 +1,42 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-22"]
+
+run = "npm run dev"
 
 [nix]
 channel = "stable-25_05"
 
 [agent]
 expertMode = true
+
+# Replit Deployments (Reserved VM / Autoscale) build then run the Nitro Node server.
+[deployment]
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3002
+
+[[ports]]
+localPort = 8090
+externalPort = 3003
+
+[[ports]]
+localPort = 8096
+externalPort = 3001
+
+[[ports]]
+localPort = 8098
+externalPort = 3000
+
+[[ports]]
+localPort = 8099
+externalPort = 8099

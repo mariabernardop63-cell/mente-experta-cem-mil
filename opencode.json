@@ -1,0 +1,555 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "model": "tokenharbor/deepseek-v4.1-flash:free",
+  "provider": {
+    "b-ai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "env": ["BAI_API_KEY"],
+      "options": {
+        "baseURL": "https://api.b.ai/v1"
+      },
+      "models": {
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "deepseek-v3.2": {
+          "name": "DeepSeek V3.2"
+        },
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "hy3": {
+          "name": "Hunyuan Hy3"
+        },
+        "mimo-v2.5": {
+          "name": "MiMo V2.5"
+        },
+        "mimo-v2.5-pro": {
+          "name": "MiMo V2.5 Pro"
+        },
+        "grok-4.5": {
+          "name": "Grok 4.5"
+        },
+        "grok-4.6": {
+          "name": "Grok 4.6"
+        },
+        "glm-5-1": {
+          "name": "GLM 5.1"
+        },
+        "glm-5-2": {
+          "name": "GLM 5.2"
+        },
+        "glm-5-3": {
+          "name": "GLM 5.3"
+        },
+        "glm-5.3-flash": {
+          "name": "GLM 5.3 Flash"
+        },
+        "kimi-k2.5": {
+          "name": "Kimi K2.5"
+        },
+        "kimi-k2.6": {
+          "name": "Kimi K2.6"
+        },
+        "kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "qwen3.6-27b": {
+          "name": "Qwen3.6 27B"
+        },
+        "qwen3.7-max": {
+          "name": "Qwen3.7 Max"
+        },
+        "qwen3.8-27b": {
+          "name": "Qwen3.8 27B"
+        },
+        "qwen3.8-max": {
+          "name": "Qwen3.8 Max"
+        },
+        "minimax-m2.5": {
+          "name": "MiniMax M2.5"
+        },
+        "minimax-m2.7": {
+          "name": "MiniMax M2.7"
+        },
+        "minimax-m3": {
+          "name": "MiniMax M3"
+        },
+        "gpt-5-2": {
+          "name": "GPT 5.2"
+        },
+        "gpt-5-4": {
+          "name": "GPT 5.4"
+        },
+        "gpt-5-4-mini": {
+          "name": "GPT 5.4 Mini"
+        },
+        "gpt-5-4-nano": {
+          "name": "GPT 5.4 Nano"
+        },
+        "gpt-5-4-pro": {
+          "name": "GPT 5.4 Pro"
+        },
+        "gpt-5-5": {
+          "name": "GPT 5.5"
+        },
+        "gpt-5-5-instant": {
+          "name": "GPT 5.5 Instant"
+        },
+        "gpt-5-6-luna": {
+          "name": "GPT 5.6 Luna"
+        },
+        "gpt-5-6-sol": {
+          "name": "GPT 5.6 Sol"
+        },
+        "gpt-5-6-terra": {
+          "name": "GPT 5.6 Terra"
+        },
+        "gpt-5-mini": {
+          "name": "GPT 5 Mini"
+        },
+        "gpt-5-nano": {
+          "name": "GPT 5 Nano"
+        },
+        "claude-fable-5": {
+          "name": "Claude Fable 5"
+        },
+        "claude-haiku-4-5": {
+          "name": "Claude Haiku 4.5"
+        },
+        "claude-opus-4-5": {
+          "name": "Claude Opus 4.5"
+        },
+        "claude-opus-4-6": {
+          "name": "Claude Opus 4.6"
+        },
+        "claude-opus-4-7": {
+          "name": "Claude Opus 4.7"
+        },
+        "claude-opus-4-8": {
+          "name": "Claude Opus 4.8"
+        },
+        "claude-opus-5": {
+          "name": "Claude Opus 5"
+        },
+        "claude-sonnet-4-5": {
+          "name": "Claude Sonnet 4.5"
+        },
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6"
+        },
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        },
+        "gemini-3-1-pro": {
+          "name": "Gemini 3.1 Pro"
+        },
+        "gemini-3-5-flash": {
+          "name": "Gemini 3.5 Flash"
+        },
+        "gemini-3-5-flash-lite": {
+          "name": "Gemini 3.5 Flash Lite"
+        },
+        "gemini-3-6-flash": {
+          "name": "Gemini 3.6 Flash"
+        },
+        "gemini-3-flash": {
+          "name": "Gemini 3 Flash"
+        }
+      }
+    },
+    "tokenrouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "env": ["TOKENROUTER_API_KEY"],
+      "options": {
+        "baseURL": "https://api.tokenrouter.com/v1"
+      },
+      "models": {
+        "openai/gpt-5.4-nano": {
+          "name": "Gpt 5.4 Nano"
+        },
+        "qwen/qwen3.5-9b": {
+          "name": "Qwen3.5 9B"
+        },
+        "qwen/qwen3.7-max": {
+          "name": "Qwen3.7 Max"
+        },
+        "deepseek/deepseek-v4-pro": {
+          "name": "Deepseek V4 Pro"
+        },
+        "MiniMax-M3": {
+          "name": "Minimax M3"
+        },
+        "miromind/mirothinker-1-7-deepresearch": {
+          "name": "Mirothinker 1 7 Deepresearch"
+        },
+        "qwen/qwen3.5-plus-02-15": {
+          "name": "Qwen3.5 Plus 02 15"
+        },
+        "x-ai/grok-4.20-beta": {
+          "name": "Grok 4.20 Beta"
+        },
+        "openai/gpt-5.2": {
+          "name": "Gpt 5.2"
+        },
+        "deepseek/deepseek-v3.2": {
+          "name": "Deepseek V3.2"
+        },
+        "stepfun/step-3.5-flash": {
+          "name": "Step 3.5 Flash"
+        },
+        "x-ai/grok-4.6": {
+          "name": "Grok 4.6"
+        },
+        "z-ai/glm-5-turbo": {
+          "name": "Glm 5 Turbo"
+        },
+        "moonshotai/kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "qwen3.6-flash": {
+          "name": "Qwen3.6 Flash"
+        },
+        "x-ai/grok-4.5": {
+          "name": "Grok 4.5"
+        },
+        "qwen/qwen3.5-397b-a17b": {
+          "name": "Qwen3.5 397B A17B"
+        },
+        "qwen/qwen3.8-max": {
+          "name": "Qwen3.8 Max"
+        },
+        "deepseek/deepseek-v4-flash-vision-exp": {
+          "name": "Deepseek V4 Flash Vision Exp"
+        },
+        "tencent/hy3-preview": {
+          "name": "Hy3 Preview"
+        },
+        "z-ai/glm-5.1": {
+          "name": "Glm 5.1"
+        },
+        "nvidia/nemotron-3.5-lightning": {
+          "name": "Nemotron 3.5 Lightning"
+        },
+        "deepseek/deepseek-v4-pro-0813": {
+          "name": "Deepseek V4 Pro 0813"
+        },
+        "qwen3.5-omni-plus": {
+          "name": "Qwen3.5 Omni Plus"
+        },
+        "seed-2-0-pro-260328": {
+          "name": "Seed 2 0 Pro 260328"
+        },
+        "moonshotai/kimi-k2.7-code": {
+          "name": "Kimi K2.7 Code"
+        },
+        "xiaomi/mimo-v2-pro": {
+          "name": "Mimo V2 Pro"
+        },
+        "z-ai/glm-4.6v": {
+          "name": "Glm 4.6V"
+        },
+        "z-ai/glm-5.2": {
+          "name": "Glm 5.2"
+        },
+        "openai/gpt-oss-120b": {
+          "name": "Gpt Oss 120B"
+        },
+        "x-ai/grok-4.1-fast": {
+          "name": "Grok 4.1 Fast"
+        },
+        "seed-2-0-mini-260428": {
+          "name": "Seed 2 0 Mini 260428"
+        },
+        "qwen/qwen3-coder-next": {
+          "name": "Qwen3 Coder Next"
+        },
+        "seed-2-0-code-preview-260328": {
+          "name": "Seed 2 0 Code Preview 260328"
+        },
+        "xiaomi/mimo-v2-flash": {
+          "name": "Mimo V2 Flash"
+        },
+        "openai/gpt-5.4-mini": {
+          "name": "Gpt 5.4 Mini"
+        },
+        "z-ai/glm-4.5-air": {
+          "name": "Glm 4.5 Air"
+        },
+        "mistralai/voxtral-small-24b-2507": {
+          "name": "Voxtral Small 24B 2507"
+        },
+        "nvidia/nemotron-3-super-120b-a12b": {
+          "name": "Nemotron 3 Super 120B A12B"
+        },
+        "minimax/minimax-m2-her": {
+          "name": "Minimax M2 Her"
+        },
+        "z-ai/glm-5.3": {
+          "name": "Glm 5.3"
+        },
+        "claude-haiku-4-5": {
+          "name": "Claude Haiku 4 5"
+        },
+        "claude-opus-4-8-m-aws": {
+          "name": "Claude Opus 4 8 M Aws"
+        },
+        "xiaomi/mimo-v2.5-pro": {
+          "name": "Mimo V2.5 Pro"
+        },
+        "minimax/minimax-m2.7-highspeed": {
+          "name": "Minimax M2.7 Highspeed"
+        },
+        "miromind/mirothinker-1-7-deepresearch-mini": {
+          "name": "Mirothinker 1 7 Deepresearch Mini"
+        },
+        "qwen/qwen3.5-122b-a10b": {
+          "name": "Qwen3.5 122B A10B"
+        },
+        "minimax/minimax-m2.7": {
+          "name": "Minimax M2.7"
+        },
+        "xiaomi/mimo-v2.5": {
+          "name": "Mimo V2.5"
+        },
+        "ex/gpt-5.4": {
+          "name": "Gpt 5.4"
+        },
+        "mistralai/mistral-medium-3-5": {
+          "name": "Mistral Medium 3 5"
+        },
+        "qwen/qwen3.7-plus": {
+          "name": "Qwen3.7 Plus"
+        },
+        "qwen/qwen3.5-35b-a3b": {
+          "name": "Qwen3.5 35B A3B"
+        },
+        "openai/gpt-5.4-pro": {
+          "name": "Gpt 5.4 Pro"
+        },
+        "stepfun/step-3.7-flash": {
+          "name": "Step 3.7 Flash"
+        },
+        "mistralai/devstral-2512": {
+          "name": "Devstral 2512"
+        },
+        "x-ai/grok-4.3": {
+          "name": "Grok 4.3"
+        },
+        "x-ai/grok-build-0.1": {
+          "name": "Grok Build 0.1"
+        },
+        "openai/gpt-5": {
+          "name": "Gpt 5"
+        },
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+          "name": "Nemotron 3 Nano Omni 30B A3B Reasoning:Free"
+        },
+        "deepseek/deepseek-v4-flash": {
+          "name": "Deepseek V4 Flash"
+        },
+        "sakana/fugu-ultra": {
+          "name": "Fugu Ultra"
+        },
+        "openai/gpt-4o-mini": {
+          "name": "Gpt 4O Mini"
+        },
+        "z-ai/glm-4.6": {
+          "name": "Glm 4.6"
+        },
+        "qwen/qwen3.8-max-free": {
+          "name": "Qwen3.8 Max Free"
+        },
+        "seed-2-0-lite-260428": {
+          "name": "Seed 2 0 Lite 260428"
+        },
+        "z-ai/glm-4.7": {
+          "name": "Glm 4.7"
+        },
+        "deepseek/deepseek-v4-flash-0731": {
+          "name": "Deepseek V4 Flash 0731"
+        },
+        "moonshotai/kimi-k2.6": {
+          "name": "Kimi K2.6"
+        },
+        "qwen/qwen3.5-flash": {
+          "name": "Qwen3.5 Flash"
+        },
+        "moonshotai/kimi-k2.5": {
+          "name": "Kimi K2.5"
+        },
+        "minimax/minimax-m2.5": {
+          "name": "Minimax M2.5"
+        },
+        "qwen/qwen3.6-plus": {
+          "name": "Qwen3.6 Plus"
+        },
+        "xiaomi/mimo-v2-omni": {
+          "name": "Mimo V2 Omni"
+        },
+        "openai/gpt-5-mini": {
+          "name": "Gpt 5 Mini"
+        },
+        "mistralai/mistral-small-2603": {
+          "name": "Mistral Small 2603"
+        },
+        "minimax/minimax-m2.1": {
+          "name": "Minimax M2.1"
+        },
+        "minimax/minimax-m2.1-highspeed": {
+          "name": "Minimax M2.1 Highspeed"
+        },
+        "z-ai/glm-5": {
+          "name": "Glm 5"
+        }
+      }
+    },
+    "teamorouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "env": ["TEAMOROUTER_API_KEY"],
+      "options": {
+        "baseURL": "https://api.teamorouter.com/v1"
+      },
+      "models": {
+        "claude-fable-5": {
+          "name": "Claude Fable 5"
+        },
+        "claude-opus-5": {
+          "name": "Claude Opus 5"
+        },
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        },
+        "claude-opus-4-8": {
+          "name": "Claude Opus 4.8"
+        },
+        "claude-opus-4-7": {
+          "name": "Claude Opus 4.7"
+        },
+        "claude-opus-4-6": {
+          "name": "Claude Opus 4.6"
+        },
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6"
+        },
+        "claude-haiku-4-5": {
+          "name": "Claude Haiku 4.5"
+        },
+        "gpt-5.6-sol": {
+          "name": "GPT 5.6 Sol"
+        },
+        "gpt-5.6-terra": {
+          "name": "GPT 5.6 Terra"
+        },
+        "gpt-5.6-luna": {
+          "name": "GPT 5.6 Luna"
+        },
+        "gpt-5.5": {
+          "name": "GPT 5.5"
+        },
+        "gpt-5.4": {
+          "name": "GPT 5.4"
+        },
+        "gpt-5.4-mini": {
+          "name": "GPT 5.4 Mini"
+        },
+        "gpt-image-2": {
+          "name": "GPT Image 2"
+        },
+        "gemini-3.7-flash": {
+          "name": "Gemini 3.7 Flash"
+        },
+        "gemini-3.6-flash": {
+          "name": "Gemini 3.6 Flash"
+        },
+        "gemini-3.5-flash-lite": {
+          "name": "Gemini 3.5 Flash Lite"
+        },
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro Preview"
+        },
+        "gemini-3.5-flash": {
+          "name": "Gemini 3.5 Flash"
+        },
+        "gemini-3.1-flash-lite-preview": {
+          "name": "Gemini 3.1 Flash Lite Preview"
+        },
+        "kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "deepseek-v4-flash-vision-exp": {
+          "name": "DeepSeek V4 Flash Vision Exp"
+        },
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "deepseek-v4-pro-free": {
+          "name": "DeepSeek V4 Pro Free"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "deepseek-v4-flash-free": {
+          "name": "DeepSeek V4 Flash Free"
+        },
+        "glm-5.3-flash": {
+          "name": "GLM 5.3 Flash"
+        },
+        "glm-5.3-flash-free": {
+          "name": "GLM 5.3 Flash Free"
+        },
+        "glm-5.3": {
+          "name": "GLM 5.3"
+        },
+        "glm-5.2": {
+          "name": "GLM 5.2"
+        },
+        "grok-4.6": {
+          "name": "Grok 4.6"
+        }
+      }
+    },
+    "xkiro": {
+      "npm": "@ai-sdk/openai-compatible",
+      "env": ["XKIRO_API_KEY"],
+      "options": {
+        "baseURL": "https://api.xkiro.com/v1"
+      },
+      "models": {
+        "deepseek/deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "deepseek/deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "minimax/minimax-m2.7": {
+          "name": "MiniMax M2.7"
+        },
+        "minimax/minimax-m2.7-highspeed": {
+          "name": "MiniMax M2.7 Highspeed"
+        }
+      }
+    },
+    "tokenharbor": {
+      "npm": "@ai-sdk/openai-compatible",
+      "env": ["TOKENHARBOR_API_KEY"],
+      "options": {
+        "baseURL": "https://tokenharbor.ai/v1"
+      },
+      "models": {
+        "deepseek-v4.1-flash:free": {
+          "name": "DeepSeek V4.1 Flash (Free)"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "th-orchestra": {
+          "name": "TH Orchestra"
+        },
+        "claude-opus-5": {
+          "name": "Claude Opus 5"
+        }
+      }
+    }
+  }
+}
