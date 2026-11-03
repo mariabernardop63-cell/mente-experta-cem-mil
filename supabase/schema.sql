@@ -199,7 +199,7 @@ values
     'Beta',
     'O primeiro passo',
     19.90,
-    '["Ebook digital","Como Fazer 100K Antes de 2027","Versão Beta"]'::jsonb,
+    '["Ebook digital","Como Fazer 50K Antes de 2027","Versão Beta"]'::jsonb,
     false,
     1
   ),
@@ -213,6 +213,12 @@ values
     2
   )
 on conflict (id) do nothing;
+
+-- Renomeia a coleção nos produtos que já existiam com o nome antigo (100K).
+-- Idempotente: só toca nas linhas que ainda mencionam 100K.
+update public.products
+set features = replace(features::text, 'Como Fazer 100K Antes de 2027', 'Como Fazer 50K Antes de 2027')::jsonb
+where features::text like '%Como Fazer 100K Antes de 2027%';
 
 -- ---------------------------------------------------------------------------
 -- 7b. Carteiras móveis iniciais (editáveis em /admin > Pagamentos)

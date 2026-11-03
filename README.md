@@ -1,7 +1,7 @@
 # MenteExperta
 
 Landing page premium e corporativa da **MenteExperta**, com venda dos ebooks
-**Como Fazer 100K Antes de 2027** (edição Beta e Premium), pagamento por
+**Como Fazer 50K Antes de 2027** (edição Beta e Premium), pagamento por
 **PIX** (Brasil e restantes países) e por **carteira móvel** e-Mola ou M-Pesa
 (Moçambique), painel de administração, entrega automática do PDF e registo de
 visitas.

@@ -107,7 +107,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
     name: "Beta",
     tagline: "O primeiro passo",
     price: 19.9,
-    features: ["Ebook digital", "Como Fazer 100K Antes de 2027", "Versão Beta"],
+    features: ["Ebook digital", "Como Fazer 50K Antes de 2027", "Versão Beta"],
     premium: false,
     hasPdf: false,
     sortOrder: 1,

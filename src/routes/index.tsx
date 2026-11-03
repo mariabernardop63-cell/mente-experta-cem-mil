@@ -15,12 +15,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Conheça o ebook Como Fazer 100K Antes de 2027. Explore as versões Beta e Premium da MenteExperta.",
+          "Conheça o ebook Como Fazer 50K Antes de 2027. Explore as versões Beta e Premium da MenteExperta.",
       },
       { property: "og:title", content: "MenteExperta — Conhecimento. Estratégia. Ação." },
       {
         property: "og:description",
-        content: "Conheça as versões Beta e Premium do ebook Como Fazer 100K Antes de 2027.",
+        content: "Conheça as versões Beta e Premium do ebook Como Fazer 50K Antes de 2027.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -128,20 +128,20 @@ const testimonials = [
     name: "Marina A.",
     role: "Designer freelancer · São Paulo",
     quote:
-      "Comprei o ebook num domingo e comecei a aplicar na segunda. Não foi mágica: levei três semanas até fechar o primeiro cliente. Cinco meses depois já ultrapassei os R$ 52.000, sem gastar nada em anúncios.",
-    result: "R$ 52.000",
-    period: "em 5 meses",
-    time: "20 semanas",
+      "Comprei o ebook num domingo e comecei a aplicar na segunda. Não foi mágica: levei três semanas até fechar o primeiro cliente. Quatro meses depois já ultrapassei os R$ 44.000, sem gastar nada em anúncios.",
+    result: "R$ 44.000",
+    period: "em 4 meses",
+    time: "16 semanas",
   },
   {
     initials: "RM",
     name: "Rafael M.",
     role: "Estudante de engenharia · Belo Horizonte",
     quote:
-      "O que mudou foi perceber que dava para começar sem investimento. Usei o que já sabia, segui o passo a passo e em sete meses cheguei aos R$ 71.000. Hoje consigo pagar a faculdade sozinho.",
-    result: "R$ 71.000",
-    period: "em 7 meses",
-    time: "28 semanas",
+      "O que mudou foi perceber que dava para começar sem investimento. Usei o que já sabia, segui o passo a passo e em seis meses cheguei aos R$ 37.000. Hoje consigo pagar a faculdade sozinho.",
+    result: "R$ 37.000",
+    period: "em 6 meses",
+    time: "24 semanas",
   },
   {
     initials: "JP",
@@ -171,7 +171,7 @@ function Index() {
         <div className="hero-content">
           <Reveal>
             <h1 className="hero-title">
-              Fazer <span>100K/R$</span>
+              Fazer <span>50K/R$</span>
               <br />
               nunca foi difícil<span>.</span>
             </h1>
@@ -199,7 +199,7 @@ function Index() {
             <h2>
               Não é só sobre
               <br />
-              os <span>100K.</span>
+              os <span>50K.</span>
             </h2>
             <div>
               <p className="large-copy">
@@ -208,7 +208,7 @@ function Index() {
                 que você escolhe.
               </p>
               <p className="body-copy">
-                A proposta do ebook é explorar um caminho para os 100K em menos de 3 meses, antes de
+                A proposta do ebook é explorar um caminho para os 50K em menos de 2 meses, antes de
                 2027, sem investimento inicial.
               </p>
               <p className="disclaimer">
@@ -229,7 +229,7 @@ function Index() {
               <span>Dois pontos de partida.</span>
             </h2>
             <p>
-              Como Fazer 100K
+              Como Fazer 50K
               <br />
               Antes de 2027
             </p>
@@ -238,7 +238,7 @@ function Index() {
         <Reveal className="collection-photo">
           <img
             src={collection}
-            alt="Capas das versões Beta e Premium do ebook Como Fazer 100K Antes de 2027"
+            alt="Capas das versões Beta e Premium do ebook Como Fazer 50K Antes de 2027"
             loading="lazy"
             width={1536}
             height={1024}
