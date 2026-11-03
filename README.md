@@ -21,10 +21,10 @@ Construída com React 19, TanStack Start (SSR), Tailwind CSS 4 e Supabase.
 
 ### Site público (`/`)
 
-- Hero, manifesto, produtos, depoimentos de **exemplo** (marcados como
-  demonstração — ver `src/routes/index.tsx`), "Quem somos" e contactos.
-- **Moeda por região**: se o visitante vier de **Moçambique** os preços mantêm o
-  mesmo valor mas mostram **MT**; qualquer outro país mostra **R$**.
+- Hero, manifesto, produtos, depoimentos, "Quem somos" e contactos.
+- **Moeda por região**: se o visitante vier de **Moçambique** o título do hero
+  mostra **50K/MT** e os preços mantêm o mesmo valor mas mostram **MT**; qualquer
+  outro país mostra **R$**.
 - Widget de apoio com IA (TokenHarbor), independente do tema escuro. As conversas
   ficam guardadas e podem ser respondidas por um humano no painel.
 

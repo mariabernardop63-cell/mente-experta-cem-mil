@@ -171,7 +171,7 @@ function Index() {
         <div className="hero-content">
           <Reveal>
             <h1 className="hero-title">
-              Fazer <span>50K/R$</span>
+              Fazer <span>50K/{region.symbol}</span>
               <br />
               nunca foi difícil<span>.</span>
             </h1>
